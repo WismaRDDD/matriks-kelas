@@ -24,6 +24,7 @@ export default function DosenPage() {
     f_progdi_id: '',
   });
 
+<<<<<<< HEAD
 const fetchData = async () => {
   const res = await fetch('/api/dosen');
   const json = await res.json();
@@ -38,6 +39,24 @@ const fetchData = async () => {
     fetchData();
   }, []);
 
+=======
+const [selectedIds, setSelectedIds] = useState([]);
+
+
+useEffect(() => {
+  const fetchData = async () => {
+    const res = await fetch('/api/dosen');
+    const json = await res.json();
+
+    json.sort((a, b) => new Date(a.f_tanggallahir) - new Date(b.f_tanggallahir));
+
+    setData(json);
+    setSelectedIds([]); // reset selection
+  };
+
+  fetchData();
+}, []);
+>>>>>>> recovery
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -113,8 +132,11 @@ const handleSubmit = async () => {
     fetchData();
   };
 
+<<<<<<< HEAD
 const [selectedIds, setSelectedIds] = useState([]);
 
+=======
+>>>>>>> recovery
 const handleSelect = (id) => {
   setSelectedIds((prev) =>
     prev.includes(id)

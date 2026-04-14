@@ -15,9 +15,12 @@ export default function KurikulumPage() {
     direction: null,
   });
 
+<<<<<<< HEAD
   const [showForm, setShowForm] = useState(false);
   const [showMatkulForm, setShowMatkulForm] = useState(false);
 
+=======
+>>>>>>> recovery
   const [form, setForm] = useState({
     nama_kurikulum: '',
     tahun_ajaran: '',
@@ -33,6 +36,12 @@ export default function KurikulumPage() {
     f_statusaktifmk: '',
   });
 
+<<<<<<< HEAD
+=======
+  const [showForm, setShowForm] = useState(false);
+  const [showMatkulForm, setShowMatkulForm] = useState(false);
+
+>>>>>>> recovery
   // ================= FETCH =================
   const fetchKurikulum = async () => {
     const res = await fetch('/api/kurikulum-master');
@@ -47,6 +56,7 @@ export default function KurikulumPage() {
   };
 
   useEffect(() => {
+<<<<<<< HEAD
     fetchKurikulum();
   }, []);
 
@@ -54,6 +64,25 @@ export default function KurikulumPage() {
     fetchMatkul(selectedKurikulum);
   }, [selectedKurikulum]);
 
+=======
+    const loadKurikulum = async () => {
+      const res = await fetch('/api/kurikulum-master');
+      setKurikulumList(await res.json());
+    };
+    loadKurikulum();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedKurikulum) return;
+    
+    const loadMatkul = async () => {
+      const res = await fetch(`/api/kurikulum?kurikulum_id=${selectedKurikulum}`);
+      setMatkul(await res.json());
+      setSelectedIds([]);
+    };
+    loadMatkul();
+  }, [selectedKurikulum]);  
+>>>>>>> recovery
   // ================= TAMBAH KURIKULUM =================
   const handleSubmit = async () => {
     if (!form.nama_kurikulum) return alert('Nama wajib');
@@ -200,6 +229,10 @@ export default function KurikulumPage() {
     return '⇅';
   };
 
+<<<<<<< HEAD
+=======
+  
+>>>>>>> recovery
   // ================= UI =================
   return (
     <div style={{ padding: 20 }}>
@@ -261,6 +294,88 @@ export default function KurikulumPage() {
         )}
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* FORM KURIKULUM */}
+      {showForm && (
+        <div style={modal}>
+          <div style={modalContent}>
+            <h3>Tambah Kurikulum</h3>
+            <input
+              placeholder="Nama Kurikulum"
+              value={form.nama_kurikulum}
+              onChange={(e) => setForm({ ...form, nama_kurikulum: e.target.value })}
+            />
+            <input
+              placeholder="Tahun Ajaran (YYYY)"
+              value={form.tahun_ajaran}
+              onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
+            />
+            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+              <button style={btnPrimary} onClick={handleSubmit}>
+                Simpan
+              </button>
+              <button style={btnDanger} onClick={() => setShowForm(false)}>
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORM MATKUL */}
+      {showMatkulForm && (
+        <div style={modal}>
+          <div style={modalContent}>
+            <h3>Tambah Matakuliah</h3>
+            <input
+              placeholder="Kode MK"
+              value={matkulForm.f_kodemk}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_kodemk: e.target.value })}
+            />
+            <input
+              placeholder="Nama MK"
+              value={matkulForm.f_namamk}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_namamk: e.target.value })}
+            />
+            <input
+              placeholder="SKS"
+              value={matkulForm.f_sks_kurikulum}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_sks_kurikulum: e.target.value })}
+            />
+            <input
+              placeholder="Semester"
+              value={matkulForm.f_semester}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_semester: e.target.value })}
+            />
+            <input
+              placeholder="Nama Kelompok"
+              value={matkulForm.f_namakelompok}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_namakelompok: e.target.value })}
+            />
+            <input
+              placeholder="Singkatan"
+              value={matkulForm.f_singkatan}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_singkatan: e.target.value })}
+            />
+            <input
+              placeholder="Status Aktif"
+              value={matkulForm.f_statusaktifmk}
+              onChange={(e) => setMatkulForm({ ...matkulForm, f_statusaktifmk: e.target.value })}
+            />
+            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+              <button style={btnPrimary} onClick={handleSubmitMatkul}>
+                Simpan
+              </button>
+              <button style={btnDanger} onClick={() => setShowMatkulForm(false)}>
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+>>>>>>> recovery
       {/* TABLE */}
       <table style={{ width: '100%' }}>
         <thead>
@@ -305,6 +420,63 @@ export default function KurikulumPage() {
 }
 
 /* STYLE */
+<<<<<<< HEAD
 const btnPrimary = { padding: 8, background: '#007bff', color: '#fff' };
 const btnSuccess = { padding: 8, background: '#28a745', color: '#fff' };
 const btnDanger = { padding: 8, background: '#dc3545', color: '#fff' };
+=======
+const th = { padding: '10px', borderBottom: '2px solid #ddd', cursor: 'pointer' };
+const td = { padding: '8px', borderBottom: '1px solid #eee' };
+
+const btnPrimary = {
+  padding: '8px 12px',
+  background: '#007bff',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+};
+
+const btnSuccess = {
+  padding: '8px 12px',
+  background: '#28a745',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 6,
+};
+
+const btnDanger = {
+  padding: '6px 10px',
+  background: '#dc3545',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+};
+
+const modal = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: 'rgba(0,0,0,0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
+
+const modalContent = {
+  background: '#fff',
+  padding: 20,
+  borderRadius: 8,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  minWidth: 300,
+  background: 'rgba(0,0,0,0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
+>>>>>>> recovery
