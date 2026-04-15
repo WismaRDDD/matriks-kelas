@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-export default function DosenPage() {
+export default function RuanganPage() {
   const [data, setData] = useState([]);
   const [file, setFile] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-
+  
   const [sortConfig, setSortConfig] = useState({
     key: null,
     direction: null,
@@ -17,15 +17,11 @@ export default function DosenPage() {
 
   const [form, setForm] = useState({
     id: '',
-    f_nidn: '',
-    f_nip: '',
-    f_title_depan: '',
-    f_namapegawai: '',
-    f_title_belakang: '',
-    f_tempatlahir: '',
-    f_tanggallahir: '',
-    f_jeniskelamin: '',
-    f_progdi_id: '',
+    f_ruang_id: '',
+    f_koderuang: '',
+    f_namaruang: '',
+    f_kapasitas_kuliah: '',
+    f_alamatruang: '',
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
@@ -35,15 +31,12 @@ export default function DosenPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/dosen');
+      const res = await fetch('/api/ruangan');
       const json = await res.json();
-
-      json.sort((a, b) => new Date(a.f_tanggallahir) - new Date(b.f_tanggallahir));
-
       setData(json);
       setSelectedIds([]);
     } catch (error) {
-      showMessage('error', 'Gagal memuat data dosen');
+      showMessage('error', 'Gagal memuat data');
     } finally {
       setLoading(false);
     }
@@ -65,57 +58,21 @@ export default function DosenPage() {
 
   const handleSubmit = async () => {
     // Validations
-    if (!form.f_nidn) {
-      showMessage('error', 'NIDN wajib diisi');
+    if (!form.f_koderuang) {
+      showMessage('error', 'Kode ruangan wajib diisi');
       return;
     }
-    if (!/^\d+$/.test(form.f_nidn)) {
-      showMessage('error', 'NIDN harus berupa angka');
+    if (!form.f_namaruang) {
+      showMessage('error', 'Nama ruangan wajib diisi');
       return;
     }
-    if (form.f_nidn.length !== 10 && form.f_nidn.length !== 12) {
-      showMessage('error', 'NIDN harus 10 atau 12 digit');
-      return;
-    }
-
-    if (!form.f_nip) {
-      showMessage('error', 'NIP wajib diisi');
-      return;
-    }
-    if (!/^\d+$/.test(form.f_nip)) {
-      showMessage('error', 'NIP harus berupa angka');
-      return;
-    }
-
-    if (!form.f_namapegawai) {
-      showMessage('error', 'Nama dosen wajib diisi');
-      return;
-    }
-
-    // Tanggal validation
-    if (form.f_tanggallahir) {
-      const date = new Date(form.f_tanggallahir);
-      if (isNaN(date.getTime())) {
-        showMessage('error', 'Tanggal lahir tidak valid');
-        return;
-      }
-      
-      const year = date.getFullYear();
-      const currentYear = new Date().getFullYear();
-      if (year < 1950 || year > currentYear) {
-        showMessage('error', 'Tahun lahir tidak valid');
-        return;
-      }
-    }
-
-    // Jenis kelamin validation
-    if (form.f_jeniskelamin && !['L', 'P'].includes(form.f_jeniskelamin)) {
-      showMessage('error', 'Jenis kelamin harus L atau P');
+    if (form.f_kapasitas_kuliah && !/^\d+$/.test(form.f_kapasitas_kuliah)) {
+      showMessage('error', 'Kapasitas harus berupa angka');
       return;
     }
 
     const method = form.id ? 'PUT' : 'POST';
-    const url = form.id ? `/api/dosen/${form.id}` : '/api/dosen';
+    const url = form.id ? `/api/ruangan/${form.id}` : '/api/ruangan';
 
     try {
       const res = await fetch(url, {
@@ -126,7 +83,7 @@ export default function DosenPage() {
 
       if (!res.ok) throw new Error('Gagal menyimpan data');
 
-      showMessage('success', form.id ? 'Data dosen berhasil diupdate' : 'Data dosen berhasil ditambahkan');
+      showMessage('success', form.id ? 'Data berhasil diupdate' : 'Data berhasil ditambahkan');
       setShowForm(false);
       resetForm();
       fetchData();
@@ -138,15 +95,11 @@ export default function DosenPage() {
   const resetForm = () => {
     setForm({
       id: '',
-      f_nidn: '',
-      f_nip: '',
-      f_title_depan: '',
-      f_namapegawai: '',
-      f_title_belakang: '',
-      f_tempatlahir: '',
-      f_tanggallahir: '',
-      f_jeniskelamin: '',
-      f_progdi_id: '',
+      f_ruang_id: '',
+      f_koderuang: '',
+      f_namaruang: '',
+      f_kapasitas_kuliah: '',
+      f_alamatruang: '',
     });
     setEditingId(null);
   };
@@ -159,15 +112,11 @@ export default function DosenPage() {
   const handleEdit = (data) => {
     setForm({
       id: data.id,
-      f_nidn: data.f_nidn || '',
-      f_nip: data.f_nip || '',
-      f_title_depan: data.f_title_depan || '',
-      f_namapegawai: data.f_namapegawai || '',
-      f_title_belakang: data.f_title_belakang || '',
-      f_tempatlahir: data.f_tempatlahir || '',
-      f_tanggallahir: data.f_tanggallahir ? new Date(data.f_tanggallahir).toISOString().split('T')[0] : '',
-      f_jeniskelamin: data.f_jeniskelamin || '',
-      f_progdi_id: data.f_progdi_id || '',
+      f_ruang_id: data.f_ruang_id || '',
+      f_koderuang: data.f_koderuang || '',
+      f_namaruang: data.f_namaruang || '',
+      f_kapasitas_kuliah: data.f_kapasitas_kuliah || '',
+      f_alamatruang: data.f_alamatruang || '',
     });
     setEditingId(data.id);
     setShowForm(true);
@@ -185,14 +134,14 @@ export default function DosenPage() {
 
     setUploading(true);
     try {
-      const res = await fetch('/api/dosen/import', {
+      const res = await fetch('/api/ruangan/import', {
         method: 'POST',
         body: formData,
       });
 
       if (!res.ok) throw new Error('Import gagal');
 
-      showMessage('success', 'Import data dosen berhasil');
+      showMessage('success', 'Import data berhasil');
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
@@ -225,10 +174,10 @@ export default function DosenPage() {
       return;
     }
 
-    if (!confirm(`Hapus ${selectedIds.length} data dosen yang dipilih?`)) return;
+    if (!confirm(`Hapus ${selectedIds.length} data yang dipilih?`)) return;
 
     try {
-      const res = await fetch('/api/dosen/delete', {
+      const res = await fetch('/api/ruangan/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),
@@ -236,7 +185,7 @@ export default function DosenPage() {
 
       if (!res.ok) throw new Error('Gagal menghapus data');
 
-      showMessage('success', `${selectedIds.length} data dosen berhasil dihapus`);
+      showMessage('success', `${selectedIds.length} data berhasil dihapus`);
       setSelectedIds([]);
       fetchData();
     } catch (error) {
@@ -245,39 +194,21 @@ export default function DosenPage() {
   };
 
   const handleDeleteOne = async (id, nama) => {
-    if (!confirm(`Hapus dosen "${nama}"?`)) return;
+    if (!confirm(`Hapus ruangan "${nama}"?`)) return;
 
     try {
-      const res = await fetch(`/api/dosen/${id}`, {
+      const res = await fetch(`/api/ruangan/${id}`, {
         method: 'DELETE',
       });
 
       if (!res.ok) throw new Error('Gagal menghapus data');
 
-      showMessage('success', 'Data dosen berhasil dihapus');
+      showMessage('success', 'Data berhasil dihapus');
       fetchData();
     } catch (error) {
       showMessage('error', error.message);
     }
   };
-
-  // Helper Functions
-  function formatDateDisplay(value) {
-    if (!value) return '-';
-    return new Date(value).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  }
-
-  function formatNamaLengkap(dosen) {
-    let nama = '';
-    if (dosen.f_title_depan) nama += dosen.f_title_depan + ' ';
-    nama += dosen.f_namapegawai;
-    if (dosen.f_title_belakang) nama += ', ' + dosen.f_title_belakang;
-    return nama;
-  }
 
   // Sort Function
   const handleSort = (key) => {
@@ -294,11 +225,6 @@ export default function DosenPage() {
     sortedData.sort((a, b) => {
       let aVal = a[sortConfig.key];
       let bVal = b[sortConfig.key];
-
-      if (sortConfig.key === 'f_tanggallahir') {
-        aVal = aVal ? new Date(aVal) : null;
-        bVal = bVal ? new Date(bVal) : null;
-      }
 
       if (!aVal && !bVal) return 0;
       if (!aVal) return 1;
@@ -322,7 +248,7 @@ export default function DosenPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>👨‍🏫 Dashboard Dosen</h1>
+        <h1 style={styles.title}>🏢 Dashboard Ruangan</h1>
 
         {/* Message Display */}
         {message.text && (
@@ -335,7 +261,7 @@ export default function DosenPage() {
         <div style={styles.toolbar}>
           <div style={styles.toolbarLeft}>
             <button style={styles.btnPrimary} onClick={handleAddNew}>
-              ➕ Tambah Dosen
+              ➕ Tambah Ruangan
             </button>
             <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
               📂 Import Excel
@@ -364,8 +290,8 @@ export default function DosenPage() {
         {/* Table Section */}
         <div style={styles.tableWrapper}>
           <div style={styles.tableHeader}>
-            <h2>📋 Daftar Dosen</h2>
-            <span style={styles.badge}>Total: {data.length} dosen</span>
+            <h2>📋 Daftar Ruangan</h2>
+            <span style={styles.badge}>Total: {data.length} ruangan</span>
           </div>
 
           {loading ? (
@@ -373,8 +299,8 @@ export default function DosenPage() {
           ) : data.length === 0 ? (
             <div style={styles.emptyState}>
               <span style={styles.emptyIcon}>📭</span>
-              <p>Belum ada data dosen</p>
-              <small>Klik "Tambah Dosen" atau import dari Excel</small>
+              <p>Belum ada data ruangan</p>
+              <small>Klik "Tambah Ruangan" atau import dari Excel</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>
@@ -389,27 +315,19 @@ export default function DosenPage() {
                         style={styles.checkbox}
                       />
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nidn')}>
-                      NIDN {renderSortIcon('f_nidn')}
+                    <th style={styles.th} onClick={() => handleSort('f_koderuang')}>
+                      Kode Ruang {renderSortIcon('f_koderuang')}
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nip')}>
-                      NIP {renderSortIcon('f_nip')}
+                    <th style={styles.th} onClick={() => handleSort('f_namaruang')}>
+                      Nama Ruang {renderSortIcon('f_namaruang')}
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>
-                      Nama Lengkap {renderSortIcon('f_namapegawai')}
+                    <th style={styles.th} onClick={() => handleSort('f_kapasitas_kuliah')}>
+                      Kapasitas {renderSortIcon('f_kapasitas_kuliah')}
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>
-                      Tempat Lahir {renderSortIcon('f_tempatlahir')}
+                    <th style={styles.th} onClick={() => handleSort('f_ruang_id')}>
+                      ID Ruang {renderSortIcon('f_ruang_id')}
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>
-                      Tanggal Lahir {renderSortIcon('f_tanggallahir')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>
-                      JK {renderSortIcon('f_jeniskelamin')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>
-                      Prodi ID {renderSortIcon('f_progdi_id')}
-                    </th>
+                    <th style={styles.th}>Alamat</th>
                     <th style={styles.thAksi}>Aksi</th>
                   </tr>
                 </thead>
@@ -425,36 +343,30 @@ export default function DosenPage() {
                         />
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.badgeCode}>{d.f_nidn}</span>
-                      </td>
-                      <td style={styles.td}>{d.f_nip}</td>
-                      <td style={styles.td}>
-                        <strong>{formatNamaLengkap(d)}</strong>
-                      </td>
-                      <td style={styles.td}>{d.f_tempatlahir || '-'}</td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeDate}>{formatDateDisplay(d.f_tanggallahir)}</span>
+                        <span style={styles.badgeCode}>{d.f_koderuang}</span>
                       </td>
                       <td style={styles.td}>
-                        <span style={d.f_jeniskelamin === 'L' ? styles.badgeMale : styles.badgeFemale}>
-                          {d.f_jeniskelamin === 'L' ? '♂ Laki-laki' : d.f_jeniskelamin === 'P' ? '♀ Perempuan' : '-'}
-                        </span>
+                        <strong>{d.f_namaruang}</strong>
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
+                        <span style={styles.badgeCapacity}>👥 {d.f_kapasitas_kuliah || '-'} orang</span>
                       </td>
+                      <td style={styles.td}>
+                        <span style={styles.badgeId}>{d.f_ruang_id || '-'}</span>
+                      </td>
+                      <td style={styles.td}>{d.f_alamatruang || '-'}</td>
                       <td style={styles.tdAksi}>
                         <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit">
                           ✏️
                         </button>
-                        <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">
+                        <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namaruang)} title="Hapus">
                           🗑️
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-               </>
+              </table>
             </div>
           )}
         </div>
@@ -465,125 +377,64 @@ export default function DosenPage() {
         <div style={styles.modal} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>
-              {form.id ? '✏️ Edit Dosen' : '➕ Tambah Dosen'}
+              {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
             </h3>
+            
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Kode Ruangan *</label>
+              <input
+                style={styles.input}
+                name="f_koderuang"
+                value={form.f_koderuang}
+                onChange={handleChange}
+                placeholder="Contoh: R-101"
+              />
+            </div>
 
-            <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>NIDN *</label>
-                <input
-                  style={styles.input}
-                  name="f_nidn"
-                  value={form.f_nidn}
-                  onChange={handleChange}
-                  placeholder="10 atau 12 digit angka"
-                  disabled={!!form.id}
-                  maxLength="12"
-                />
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Nama Ruangan *</label>
+              <input
+                style={styles.input}
+                name="f_namaruang"
+                value={form.f_namaruang}
+                onChange={handleChange}
+                placeholder="Contoh: Ruang Kelas A"
+              />
+            </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>NIP *</label>
-                <input
-                  style={styles.input}
-                  name="f_nip"
-                  value={form.f_nip}
-                  onChange={handleChange}
-                  placeholder="Nomor Induk Pegawai"
-                />
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Kapasitas</label>
+              <input
+                style={styles.input}
+                name="f_kapasitas_kuliah"
+                value={form.f_kapasitas_kuliah}
+                onChange={handleChange}
+                placeholder="Jumlah kapasitas (angka)"
+                type="number"
+              />
+            </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Gelar Depan</label>
-                <input
-                  style={styles.input}
-                  name="f_title_depan"
-                  value={form.f_title_depan}
-                  onChange={handleChange}
-                  placeholder="Contoh: Dr., Prof."
-                />
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>ID Ruang</label>
+              <input
+                style={styles.input}
+                name="f_ruang_id"
+                value={form.f_ruang_id}
+                onChange={handleChange}
+                placeholder="ID ruangan"
+              />
+            </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Nama Dosen *</label>
-                <input
-                  style={styles.input}
-                  name="f_namapegawai"
-                  value={form.f_namapegawai}
-                  onChange={handleChange}
-                  placeholder="Nama lengkap"
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Gelar Belakang</label>
-                <input
-                  style={styles.input}
-                  name="f_title_belakang"
-                  value={form.f_title_belakang}
-                  onChange={handleChange}
-                  placeholder="Contoh: M.Kom., Ph.D"
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tempat Lahir</label>
-                <input
-                  style={styles.input}
-                  name="f_tempatlahir"
-                  value={form.f_tempatlahir}
-                  onChange={handleChange}
-                  placeholder="Kota tempat lahir"
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tanggal Lahir</label>
-                <input
-                  style={styles.input}
-                  type="date"
-                  name="f_tanggallahir"
-                  value={form.f_tanggallahir}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Program Studi ID</label>
-                <input
-                  style={styles.input}
-                  name="f_progdi_id"
-                  value={form.f_progdi_id}
-                  onChange={handleChange}
-                  placeholder="ID Program Studi"
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Jenis Kelamin</label>
-                <div style={styles.radioGroup}>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="L"
-                      checked={form.f_jeniskelamin === 'L'}
-                      onChange={handleChange}
-                    />
-                    <span>♂ Laki-laki</span>
-                  </label>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="P"
-                      checked={form.f_jeniskelamin === 'P'}
-                      onChange={handleChange}
-                    />
-                    <span>♀ Perempuan</span>
-                  </label>
-                </div>
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Alamat</label>
+              <textarea
+                style={styles.textarea}
+                name="f_alamatruang"
+                value={form.f_alamatruang}
+                onChange={handleChange}
+                placeholder="Alamat atau lokasi ruangan"
+                rows="3"
+              />
             </div>
 
             <div style={styles.modalActions}>
@@ -810,9 +661,8 @@ const styles = {
     fontSize: '0.875rem',
     fontWeight: '500',
     display: 'inline-block',
-    fontFamily: 'monospace',
   },
-  badgeDate: {
+  badgeCapacity: {
     backgroundColor: '#fef5e7',
     color: '#c05621',
     padding: '0.25rem 0.75rem',
@@ -820,23 +670,7 @@ const styles = {
     fontSize: '0.875rem',
     display: 'inline-block',
   },
-  badgeMale: {
-    backgroundColor: '#bee3f8',
-    color: '#2c5282',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
-  },
-  badgeFemale: {
-    backgroundColor: '#fed7e2',
-    color: '#97266d',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
-  },
-  badgeProdi: {
+  badgeId: {
     backgroundColor: '#e6fffa',
     color: '#234e52',
     padding: '0.25rem 0.75rem',
@@ -879,7 +713,7 @@ const styles = {
     background: 'white',
     padding: '2rem',
     borderRadius: '12px',
-    minWidth: '600px',
+    minWidth: '450px',
     maxWidth: '90vw',
     maxHeight: '90vh',
     overflowY: 'auto',
@@ -896,62 +730,32 @@ const styles = {
     justifyContent: 'flex-end',
     marginTop: '1.5rem',
   },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '1rem',
-  },
   formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
+    marginBottom: '1rem',
   },
   label: {
+    display: 'block',
+    marginBottom: '0.5rem',
     fontWeight: '500',
     color: '#4a5568',
     fontSize: '0.875rem',
   },
   input: {
+    width: '100%',
     padding: '0.75rem',
     borderRadius: '8px',
     border: '1px solid #cbd5e0',
     fontSize: '0.9rem',
     transition: 'border-color 0.2s',
   },
-  radioGroup: {
-    display: 'flex',
-    gap: '1rem',
-    padding: '0.5rem 0',
-  },
-  radioLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    cursor: 'pointer',
+  textarea: {
+    width: '100%',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e0',
     fontSize: '0.9rem',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    transition: 'border-color 0.2s',
   },
 };
-
-// Add hover styles (can be added via CSS or inline)
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  button:hover {
-    opacity: 0.85;
-    transform: translateY(-1px);
-  }
-  
-  input:hover, select:hover, textarea:hover {
-    border-color: #667eea;
-  }
-  
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-  
-  tr:hover {
-    background-color: #f7fafc !important;
-  }
-`;
-document.head.appendChild(styleSheet);
