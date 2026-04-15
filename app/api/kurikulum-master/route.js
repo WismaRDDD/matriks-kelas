@@ -14,6 +14,7 @@ export async function POST(req) {
 
     const result = await knex('kurikulum_master')
       .insert({
+        kode_kurikulum: body.kode_kurikulum,
         nama_kurikulum: body.nama_kurikulum,
         tahun_ajaran: body.tahun_ajaran,
       })

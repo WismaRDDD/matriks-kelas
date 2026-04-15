@@ -300,7 +300,7 @@ export default function RuanganPage() {
             <div style={styles.emptyState}>
               <span style={styles.emptyIcon}>📭</span>
               <p>Belum ada data ruangan</p>
-              <small>Klik "Tambah Ruangan" atau import dari Excel</small>
+              <small>Klik &quot;Tambah Ruangan&quot; atau import dari Excel</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>

@@ -14,7 +14,11 @@ export default function KurikulumPage() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showForm, setShowForm] = useState(false);
   const [showMatkulForm, setShowMatkulForm] = useState(false);
-  const [form, setForm] = useState({ nama_kurikulum: '', tahun_ajaran: '' });
+  const [form, setForm] = useState({ 
+    kode_kurikulum: '', 
+    nama_kurikulum: '', 
+    tahun_ajaran: '' 
+  });  
   const [matkulForm, setMatkulForm] = useState({
     f_kodemk: '',
     f_namamk: '',
@@ -66,6 +70,10 @@ export default function KurikulumPage() {
 
   // ================= TAMBAH KURIKULUM =================
   const handleSubmit = async () => {
+    if (!form.kode_kurikulum) {
+      showMessage('error', 'Kode kurikulum wajib diisi');
+      return;
+    }
     if (!form.nama_kurikulum) {
       showMessage('error', 'Nama kurikulum wajib diisi');
       return;
@@ -87,7 +95,7 @@ export default function KurikulumPage() {
 
       showMessage('success', 'Kurikulum berhasil ditambahkan');
       setShowForm(false);
-      setForm({ nama_kurikulum: '', tahun_ajaran: '' });
+      setForm({ kode_kurikulum: '', nama_kurikulum: '', tahun_ajaran: '' });
       fetchKurikulum();
     } catch (error) {
       showMessage('error', error.message);
@@ -276,7 +284,7 @@ export default function KurikulumPage() {
               <option value="">📖 Pilih Kurikulum</option>
               {kurikulumList.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {k.nama_kurikulum} ({k.tahun_ajaran})
+                  {k.kode_kurikulum} ({k.tahun_ajaran})
                 </option>
               ))}
             </select>
@@ -354,7 +362,7 @@ export default function KurikulumPage() {
             <div style={styles.emptyState}>
               <span style={styles.emptyIcon}>📭</span>
               <p>Belum ada mata kuliah</p>
-              <small>Klik "Tambah Mata Kuliah" atau import dari Excel</small>
+              <small>Klik &quot;Tambah Mata Kuliah&quot; atau import dari Excel</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>
@@ -430,18 +438,28 @@ export default function KurikulumPage() {
         <div style={styles.modal} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>Tambah Kurikulum</h3>
+            
             <input
               style={styles.input}
-              placeholder="Nama Kurikulum"
+              placeholder="Kode Kurikulum *"
+              value={form.kode_kurikulum}
+              onChange={(e) => setForm({ ...form, kode_kurikulum: e.target.value })}
+            />
+            
+            <input
+              style={styles.input}
+              placeholder="Nama Kurikulum *"
               value={form.nama_kurikulum}
               onChange={(e) => setForm({ ...form, nama_kurikulum: e.target.value })}
             />
+            
             <input
               style={styles.input}
               placeholder="Tahun Ajaran (contoh: 2024)"
               value={form.tahun_ajaran}
               onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
             />
+            
             <div style={styles.modalActions}>
               <button style={styles.btnPrimary} onClick={handleSubmit}>
                 Simpan

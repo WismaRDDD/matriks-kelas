@@ -374,7 +374,7 @@ export default function DosenPage() {
             <div style={styles.emptyState}>
               <span style={styles.emptyIcon}>📭</span>
               <p>Belum ada data dosen</p>
-              <small>Klik "Tambah Dosen" atau import dari Excel</small>
+              <small>Klik &quot;Tambah Dosen&quot; atau import dari Excel</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>
@@ -454,7 +454,7 @@ export default function DosenPage() {
                     </tr>
                   ))}
                 </tbody>
-               </>
+               </table>
             </div>
           )}
         </div>

@@ -1,16 +1,6 @@
 import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
-<<<<<<< HEAD
-export async function GET() {
-  const data = await knex('ruangan').select('*');
-  return NextResponse.json(data);
-}
-
-export async function POST(req) {
-  const body = await req.json();
-  await knex('ruangan').insert(body);
-=======
 // GET: ambil semua ruangan
 export async function GET() {
   const data = await knex('ruangan')
@@ -52,6 +42,5 @@ export async function DELETE(req, { params }) {
 
   await knex('ruangan').where({ id }).del();
 
->>>>>>> recovery
   return NextResponse.json({ success: true });
 }
