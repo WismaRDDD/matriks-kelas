@@ -6,17 +6,18 @@ import { usePathname } from 'next/navigation';
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
-  const [activeTab, setActiveTab] = useState('');
 
-  useEffect(() => {
-    // Detect which tab is active based on pathname
-    if (pathname.includes('/dosen')) setActiveTab('dosen');
-    else if (pathname.includes('/ruangan')) setActiveTab('ruangan');
-    else if (pathname.includes('/kelas')) setActiveTab('kelas');
-    else if (pathname.includes('/kurikulum')) setActiveTab('kurikulum');
-    else if (pathname.includes('/jadwal')) setActiveTab('jadwal');
-    else setActiveTab('');
-  }, [pathname]);
+  // Compute activeTab langsung dari pathname tanpa setState
+  const getActiveTab = () => {
+    if (pathname.includes('/dosen')) return 'dosen';
+    if (pathname.includes('/ruangan')) return 'ruangan';
+    if (pathname.includes('/kelas')) return 'kelas';
+    if (pathname.includes('/kurikulum')) return 'kurikulum';
+    if (pathname.includes('/jadwal')) return 'jadwal';
+    return '';
+  };
+
+  const activeTab = getActiveTab();
 
   const navItems = [
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
