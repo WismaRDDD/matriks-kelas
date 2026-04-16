@@ -5,10 +5,13 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const data = await knex('kelas')
     .leftJoin('kurikulum', 'kelas.f_matkul_id', 'kurikulum.id')
+    .leftJoin('kurikulum_master', 'kelas.f_kurikulum', 'kurikulum_master.id')
     .select(
       'kelas.*',
       'kurikulum.f_namamk',
-      'kurikulum.f_kodemk'
+      'kurikulum.f_kodemk',
+      'kurikulum_master.kode_kurikulum',
+      'kurikulum_master.nama_kurikulum'
     )
     .orderBy('kelas.id', 'desc');
 
