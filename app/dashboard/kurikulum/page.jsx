@@ -139,6 +139,26 @@ export default function KurikulumPage() {
     }
   };
 
+  // ================= DOWNLOAD TEMPLATE =================
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/kurikulum/template');
+      if (!res.ok) throw new Error('Gagal download template');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'template_kurikulum.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
   // ================= IMPORT =================
   const handleImport = async () => {
     if (!file || !selectedKurikulum) {
@@ -299,6 +319,13 @@ export default function KurikulumPage() {
           </div>
 
           <div style={styles.toolbarRight}>
+            <button
+              style={styles.btnInfo}
+              onClick={handleDownloadTemplate}
+            >
+              📥 Download Template
+            </button>
+            
             <button
               style={styles.btnSuccess}
               onClick={() => document.getElementById('fileInput').click()}
@@ -620,6 +647,17 @@ const styles = {
   btnSuccess: {
     padding: '0.5rem 1rem',
     background: '#48bb78',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  btnInfo: {
+    padding: '0.5rem 1rem',
+    background: '#4299e1',
     color: 'white',
     border: 'none',
     borderRadius: '8px',

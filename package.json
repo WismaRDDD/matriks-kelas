@@ -9,9 +9,12 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "knex migrate:latest",
-    "rollback": "knex migrate:rollback"
+    "rollback": "knex migrate:rollback",
+    "postinstall": "npm install xlsx html2canvas jspdf"
   },
   "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "knex": "^3.2.9",
     "next": "^16.2.3",
     "pg": "^8.20.0",

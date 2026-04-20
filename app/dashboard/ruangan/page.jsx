@@ -22,6 +22,7 @@ export default function RuanganPage() {
     f_namaruang: '',
     f_kapasitas_kuliah: '',
     f_alamatruang: '',
+    lantai: '',
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
@@ -100,6 +101,7 @@ export default function RuanganPage() {
       f_namaruang: '',
       f_kapasitas_kuliah: '',
       f_alamatruang: '',
+      lantai: '',
     });
     setEditingId(null);
   };
@@ -107,6 +109,25 @@ export default function RuanganPage() {
   const handleAddNew = () => {
     resetForm();
     setShowForm(true);
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/ruangan/template');
+      if (!res.ok) throw new Error('Gagal download template');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'template_ruangan.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      showMessage('error', error.message);
+    }
   };
 
   const handleEdit = (data) => {
@@ -117,6 +138,7 @@ export default function RuanganPage() {
       f_namaruang: data.f_namaruang || '',
       f_kapasitas_kuliah: data.f_kapasitas_kuliah || '',
       f_alamatruang: data.f_alamatruang || '',
+      lantai: data.lantai || '',
     });
     setEditingId(data.id);
     setShowForm(true);
@@ -141,7 +163,15 @@ export default function RuanganPage() {
 
       if (!res.ok) throw new Error('Import gagal');
 
-      showMessage('success', 'Import data berhasil');
+      const result = await res.json();
+      
+      // Build detailed message
+      let messageText = '📊 Hasil Import:\n';
+      if (result.success) messageText += `✅ Sukses: ${result.success}\n`;
+      if (result.duplicate) messageText += `⚠️ Duplikat: ${result.duplicate}\n`;
+      if (result.failed) messageText += `❌ Gagal: ${result.failed}`;
+
+      showMessage('success', messageText);
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
@@ -263,6 +293,9 @@ export default function RuanganPage() {
             <button style={styles.btnPrimary} onClick={handleAddNew}>
               ➕ Tambah Ruangan
             </button>
+            <button style={styles.btnInfo} onClick={handleDownloadTemplate}>
+              📥 Download Template
+            </button>
             <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
               📂 Import Excel
             </button>
@@ -315,6 +348,9 @@ export default function RuanganPage() {
                         style={styles.checkbox}
                       />
                     </th>
+                    <th style={styles.th} onClick={() => handleSort('f_ruang_id')}>
+                      ID Ruang {renderSortIcon('f_ruang_id')}
+                    </th>
                     <th style={styles.th} onClick={() => handleSort('f_koderuang')}>
                       Kode Ruang {renderSortIcon('f_koderuang')}
                     </th>
@@ -324,8 +360,8 @@ export default function RuanganPage() {
                     <th style={styles.th} onClick={() => handleSort('f_kapasitas_kuliah')}>
                       Kapasitas {renderSortIcon('f_kapasitas_kuliah')}
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_ruang_id')}>
-                      ID Ruang {renderSortIcon('f_ruang_id')}
+                    <th style={styles.th} onClick={() => handleSort('lantai')}>
+                      Lantai {renderSortIcon('lantai')}
                     </th>
                     <th style={styles.th}>Alamat</th>
                     <th style={styles.thAksi}>Aksi</th>
@@ -343,6 +379,9 @@ export default function RuanganPage() {
                         />
                       </td>
                       <td style={styles.td}>
+                        <span style={styles.badgeId}>{d.f_ruang_id || '-'}</span>
+                      </td>
+                      <td style={styles.td}>
                         <span style={styles.badgeCode}>{d.f_koderuang}</span>
                       </td>
                       <td style={styles.td}>
@@ -352,7 +391,7 @@ export default function RuanganPage() {
                         <span style={styles.badgeCapacity}>👥 {d.f_kapasitas_kuliah || '-'} orang</span>
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.badgeId}>{d.f_ruang_id || '-'}</span>
+                        <span style={styles.badgeCapacity}>🏢 Lantai {d.lantai || '-'}</span>
                       </td>
                       <td style={styles.td}>{d.f_alamatruang || '-'}</td>
                       <td style={styles.tdAksi}>
@@ -410,6 +449,18 @@ export default function RuanganPage() {
                 value={form.f_kapasitas_kuliah}
                 onChange={handleChange}
                 placeholder="Jumlah kapasitas (angka)"
+                type="number"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Lantai</label>
+              <input
+                style={styles.input}
+                name="lantai"
+                value={form.lantai}
+                onChange={handleChange}
+                placeholder="Nomor lantai"
                 type="number"
               />
             </div>
@@ -480,6 +531,7 @@ const styles = {
     borderRadius: '8px',
     marginBottom: '1.5rem',
     fontWeight: '500',
+    whiteSpace: 'pre-line',
   },
   messageSuccess: {
     backgroundColor: '#c6f6d5',
@@ -527,6 +579,17 @@ const styles = {
   btnDanger: {
     padding: '0.5rem 1rem',
     background: '#f56565',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  btnInfo: {
+    padding: '0.5rem 1rem',
+    background: '#4299e1',
     color: 'white',
     border: 'none',
     borderRadius: '8px',

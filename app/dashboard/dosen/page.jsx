@@ -15,6 +15,8 @@ export default function DosenPage() {
     direction: null,
   });
 
+  const [editingId, setEditingId] = useState(null);
+
   const [form, setForm] = useState({
     id: '',
     f_nidn: '',
@@ -26,10 +28,14 @@ export default function DosenPage() {
     f_tanggallahir: '',
     f_jeniskelamin: '',
     f_progdi_id: '',
+    prefer_lantai: '',
+    prefer_hari: '',
+    avoid_hari: '',
+    prefer_jam_mulai: '',
+    prefer_jam_selesai: '',
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
-  const [editingId, setEditingId] = useState(null);
 
   // Fetch Data
   const fetchData = async () => {
@@ -42,7 +48,7 @@ export default function DosenPage() {
 
       setData(json);
       setSelectedIds([]);
-    } catch (error) {
+    } catch {
       showMessage('error', 'Gagal memuat data dosen');
     } finally {
       setLoading(false);
@@ -51,6 +57,7 @@ export default function DosenPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showMessage = (type, text) => {
@@ -115,7 +122,7 @@ export default function DosenPage() {
     }
 
     const method = form.id ? 'PUT' : 'POST';
-    const url = form.id ? `/api/dosen/${form.id}` : '/api/dosen';
+    const url = '/api/dosen';
 
     try {
       const res = await fetch(url, {
@@ -147,6 +154,11 @@ export default function DosenPage() {
       f_tanggallahir: '',
       f_jeniskelamin: '',
       f_progdi_id: '',
+      prefer_lantai: '',
+      prefer_hari: '',
+      avoid_hari: '',
+      prefer_jam_mulai: '',
+      prefer_jam_selesai: '',
     });
     setEditingId(null);
   };
@@ -168,12 +180,42 @@ export default function DosenPage() {
       f_tanggallahir: data.f_tanggallahir ? new Date(data.f_tanggallahir).toISOString().split('T')[0] : '',
       f_jeniskelamin: data.f_jeniskelamin || '',
       f_progdi_id: data.f_progdi_id || '',
+      prefer_lantai: data.prefer_lantai || '',
+      prefer_hari: data.prefer_hari || '',
+      avoid_hari: data.avoid_hari || '',
+      prefer_jam_mulai: data.prefer_jam_mulai || '',
+      prefer_jam_selesai: data.prefer_jam_selesai || '',
     });
     setEditingId(data.id);
     setShowForm(true);
   };
 
   // Import Handlers
+  const downloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/dosen/import');
+      
+      if (!res.ok) {
+        throw new Error('Download template gagal');
+      }
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template-dosen.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showMessage('success', '✅ Template berhasil diunduh');
+    } catch (error) {
+      showMessage('error', `❌ ${error.message}`);
+    }
+  };
+
+  // Import Data Handler
   const handleImport = async () => {
     if (!file) {
       showMessage('error', 'Pilih file terlebih dahulu');
@@ -190,15 +232,30 @@ export default function DosenPage() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Import gagal');
+      const result = await res.json();
 
-      showMessage('success', 'Import data dosen berhasil');
+      if (!res.ok) {
+        throw new Error(result.error || 'Import gagal');
+      }
+
+      const summary = result.summary || result;
+      const errorList = result.errors ? result.errors.slice(0, 5).join('\n') : '';
+      
+      let message = `✅ Import selesai: ${summary.success} sukses, ${summary.failed} gagal, ${summary.duplicated || 0} duplikat`;
+      if (errorList) {
+        message += `\n\n⚠️ Beberapa error:\n${errorList}`;
+        if (result.errors.length > 5) {
+          message += `\n... dan ${result.errors.length - 5} error lainnya`;
+        }
+      }
+      
+      showMessage('success', message);
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
       fetchData();
     } catch (error) {
-      showMessage('error', error.message);
+      showMessage('error', `❌ ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -234,7 +291,8 @@ export default function DosenPage() {
         body: JSON.stringify({ ids: selectedIds }),
       });
 
-      if (!res.ok) throw new Error('Gagal menghapus data');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
 
       showMessage('success', `${selectedIds.length} data dosen berhasil dihapus`);
       setSelectedIds([]);
@@ -248,11 +306,14 @@ export default function DosenPage() {
     if (!confirm(`Hapus dosen "${nama}"?`)) return;
 
     try {
-      const res = await fetch(`/api/dosen/${id}`, {
-        method: 'DELETE',
+      const res = await fetch('/api/dosen/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) throw new Error('Gagal menghapus data');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
 
       showMessage('success', 'Data dosen berhasil dihapus');
       fetchData();
@@ -319,6 +380,34 @@ export default function DosenPage() {
     return '↕️';
   };
 
+  // Add hover styles on client side only
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      button:hover {
+        opacity: 0.85;
+        transform: translateY(-1px);
+      }
+      
+      input:hover, select:hover, textarea:hover {
+        border-color: #667eea;
+      }
+      
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      
+      tr:hover {
+        background-color: #f7fafc !important;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -336,6 +425,9 @@ export default function DosenPage() {
           <div style={styles.toolbarLeft}>
             <button style={styles.btnPrimary} onClick={handleAddNew}>
               ➕ Tambah Dosen
+            </button>
+            <button style={styles.btnSuccess} onClick={downloadTemplate}>
+              📥 Template Excel
             </button>
             <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
               📂 Import Excel
@@ -410,6 +502,15 @@ export default function DosenPage() {
                     <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>
                       Prodi ID {renderSortIcon('f_progdi_id')}
                     </th>
+                    <th style={styles.th} onClick={() => handleSort('prefer_lantai')}>
+                      Prefer Lantai {renderSortIcon('prefer_lantai')}
+                    </th>
+                    <th style={styles.th} onClick={() => handleSort('prefer_hari')}>
+                      Prefer Hari {renderSortIcon('prefer_hari')}
+                    </th>
+                    <th style={styles.th} onClick={() => handleSort('avoid_hari')}>
+                      Avoid Hari {renderSortIcon('avoid_hari')}
+                    </th>
                     <th style={styles.thAksi}>Aksi</th>
                   </tr>
                 </thead>
@@ -442,6 +543,15 @@ export default function DosenPage() {
                       </td>
                       <td style={styles.td}>
                         <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
+                      </td>
+                      <td style={styles.td}>
+                        <span style={styles.badgeCode}>{d.prefer_lantai || '-'}</span>
+                      </td>
+                      <td style={styles.td}>
+                        <small>{d.prefer_hari ? d.prefer_hari.split(',').join(', ') : '-'}</small>
+                      </td>
+                      <td style={styles.td}>
+                        <small style={{ color: '#e53e3e', fontWeight: '500' }}>{d.avoid_hari || '-'}</small>
                       </td>
                       <td style={styles.tdAksi}>
                         <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit">
@@ -583,6 +693,61 @@ export default function DosenPage() {
                     <span>♀ Perempuan</span>
                   </label>
                 </div>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Preferensi Lantai</label>
+                <input
+                  style={styles.input}
+                  name="prefer_lantai"
+                  value={form.prefer_lantai}
+                  onChange={handleChange}
+                  placeholder="Contoh: 1, 2, 3"
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Preferensi Hari</label>
+                <input
+                  style={styles.input}
+                  name="prefer_hari"
+                  value={form.prefer_hari}
+                  onChange={handleChange}
+                  placeholder="Contoh: Senin,Selasa,Rabu"
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Hari yang Dihindari</label>
+                <input
+                  style={styles.input}
+                  name="avoid_hari"
+                  value={form.avoid_hari}
+                  onChange={handleChange}
+                  placeholder="Contoh: Jumat"
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Jam Mulai Preferensi</label>
+                <input
+                  style={styles.input}
+                  type="time"
+                  name="prefer_jam_mulai"
+                  value={form.prefer_jam_mulai}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Jam Selesai Preferensi</label>
+                <input
+                  style={styles.input}
+                  type="time"
+                  name="prefer_jam_selesai"
+                  value={form.prefer_jam_selesai}
+                  onChange={handleChange}
+                />
               </div>
             </div>
 
@@ -931,27 +1096,3 @@ const styles = {
     fontSize: '0.9rem',
   },
 };
-
-// Add hover styles (can be added via CSS or inline)
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  button:hover {
-    opacity: 0.85;
-    transform: translateY(-1px);
-  }
-  
-  input:hover, select:hover, textarea:hover {
-    border-color: #667eea;
-  }
-  
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-  
-  tr:hover {
-    background-color: #f7fafc !important;
-  }
-`;
-document.head.appendChild(styleSheet);
