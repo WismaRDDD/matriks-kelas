@@ -8,45 +8,21 @@ export default function DashboardHome() {
 
   const navItems = [
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
-    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
     { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
+    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
     { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
     { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
   ];
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Matriks Kelas</h1>
-      </div>
-
-      {/* Navigation */}
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          {navItems.map(item => (
-            <Link key={item.id} href={item.href}>
-              <button
-                style={{
-                  ...styles.navItem,
-                  ...(activeTab === item.id ? styles.navItemActive : {}),
-                }}
-                onClick={() => setActiveTab(item.id)}
-              >
-                {item.label}
-                {activeTab === item.id && <div style={styles.navUnderline}></div>}
-              </button>
-            </Link>
-          ))}
-        </div>
-      </nav>
 
       {/* Content */}
       <div style={styles.content}>
         <div style={styles.welcomeContainer}>
           <h2 style={styles.welcomeTitle}>👋 Selamat datang di Matriks Kelas</h2>
           <p style={styles.welcomeSubtitle}>
-            Silakan pilih menu di atas untuk memulai
+            Silakan pilih menu di bawah untuk memulai
           </p>
           <div style={styles.welcomeGrid}>
             {navItems.map(item => (

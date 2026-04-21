@@ -155,7 +155,6 @@ export default function KurikulumPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showMessage('success', 'Template berhasil diunduh');
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -329,8 +328,18 @@ export default function KurikulumPage() {
           </div>
 
           <div style={styles.toolbarRight}>
-            <button style={styles.btnOutline} onClick={handleDownloadTemplate}>
-              <span style={styles.btnIcon}>📥</span> Template
+            <button
+              style={styles.btnInfo}
+              onClick={handleDownloadTemplate}
+            >
+              📥 Download Template
+            </button>
+            
+            <button
+              style={styles.btnSuccess}
+              onClick={() => document.getElementById('fileInput').click()}
+            >
+              📂 Import Excel
             </button>
             
             <button style={styles.btnOutline} onClick={() => document.getElementById('fileInput').click()}>
@@ -711,9 +720,20 @@ const styles = {
     fontWeight: '500',
     cursor: 'not-allowed',
   },
-  btnSmallPrimary: {
-    padding: '0.375rem 0.875rem',
-    backgroundColor: colors.primary,
+  btnInfo: {
+    padding: '0.5rem 1rem',
+    background: '#4299e1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  btnDanger: {
+    padding: '0.5rem 1rem',
+    background: '#f56565',
     color: 'white',
     border: 'none',
     borderRadius: '20px',

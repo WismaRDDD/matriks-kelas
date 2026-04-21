@@ -13,7 +13,15 @@ export async function up(knex) {
       .onDelete('CASCADE');
 
     table.string('nama_kelas'); 
-    table.string('dosen');      
+    table.string('dosen');
+    
+    // Kolom baru yang diambil dari tabel kurikulum
+    table.integer('f_sks_kurikulum').nullable().comment('SKS mata kuliah dari kurikulum');
+    table.integer('f_semester').nullable().comment('Semester mata kuliah dari kurikulum');
+    
+    // Field untuk menyimpan format [f_namamk] ([f_semester][kelas][kode_kurikulum]-[f_namapegawai])
+    // Contoh: Pendidikan Agama (2A-S1SI-Suprima)
+    table.string('display_name').nullable().comment('Format: Nama MK (Semester+Kelas+Kode-Dosen)');
 
     table.timestamps(true, true);
   });

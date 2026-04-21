@@ -125,7 +125,6 @@ export default function RuanganPage() {
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showMessage('success', 'Template berhasil diunduh');
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -166,7 +165,8 @@ export default function RuanganPage() {
 
       const result = await res.json();
       
-      let messageText = `📊 Hasil Import:\n`;
+      // Build detailed message
+      let messageText = '📊 Hasil Import:\n';
       if (result.success) messageText += `✅ Sukses: ${result.success}\n`;
       if (result.duplicate) messageText += `⚠️ Duplikat: ${result.duplicate}\n`;
       if (result.failed) messageText += `❌ Gagal: ${result.failed}`;
@@ -300,8 +300,11 @@ export default function RuanganPage() {
             <button style={styles.btnPrimary} onClick={handleAddNew}>
               <span style={styles.btnIcon}>+</span> Tambah Ruangan
             </button>
-            <button style={styles.btnOutline} onClick={handleDownloadTemplate}>
-              <span style={styles.btnIcon}>📥</span> Template
+            <button style={styles.btnInfo} onClick={handleDownloadTemplate}>
+              📥 Download Template
+            </button>
+            <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
+              📂 Import Excel
             </button>
             <button style={styles.btnOutline} onClick={() => document.getElementById('fileInput').click()}>
               <span style={styles.btnIcon}>📂</span> Import Excel
@@ -405,7 +408,7 @@ export default function RuanganPage() {
                         <span style={styles.badgeCapacity}>👥 {d.f_kapasitas_kuliah || '-'} orang</span>
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.floorBadge}>🏢 Lantai {d.lantai || '-'}</span>
+                        <span style={styles.badgeCapacity}>🏢 Lantai {d.lantai || '-'}</span>
                       </td>
                       <td style={styles.td}>{d.f_alamatruang || '-'}</td>
                       <td style={styles.tdAksi}>
@@ -429,11 +432,65 @@ export default function RuanganPage() {
       {showForm && (
         <div style={styles.modalOverlay} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>
-                {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
-              </h3>
-              <button style={styles.modalClose} onClick={() => setShowForm(false)}>×</button>
+            <h3 style={styles.modalTitle}>
+              {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
+            </h3>
+            
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Kode Ruangan *</label>
+              <input
+                style={styles.input}
+                name="f_koderuang"
+                value={form.f_koderuang}
+                onChange={handleChange}
+                placeholder="Contoh: R-101"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Nama Ruangan *</label>
+              <input
+                style={styles.input}
+                name="f_namaruang"
+                value={form.f_namaruang}
+                onChange={handleChange}
+                placeholder="Contoh: Ruang Kelas A"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Kapasitas</label>
+              <input
+                style={styles.input}
+                name="f_kapasitas_kuliah"
+                value={form.f_kapasitas_kuliah}
+                onChange={handleChange}
+                placeholder="Jumlah kapasitas (angka)"
+                type="number"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Lantai</label>
+              <input
+                style={styles.input}
+                name="lantai"
+                value={form.lantai}
+                onChange={handleChange}
+                placeholder="Nomor lantai"
+                type="number"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>ID Ruang</label>
+              <input
+                style={styles.input}
+                name="f_ruang_id"
+                value={form.f_ruang_id}
+                onChange={handleChange}
+                placeholder="ID ruangan"
+              />
             </div>
             
             <div style={styles.modalBody}>
@@ -537,15 +594,12 @@ const styles = {
     flexWrap: 'wrap',
     gap: '1rem',
   },
-  title: globalStyles.title,
-  subtitle: globalStyles.subtitle,
-  statsBadge: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '0.5rem',
-    backgroundColor: colors.background,
-    padding: '0.5rem 1rem',
-    borderRadius: '40px',
+  message: {
+    padding: '1rem',
+    borderRadius: '8px',
+    marginBottom: '1.5rem',
+    fontWeight: '500',
+    whiteSpace: 'pre-line',
   },
   statsNumber: {
     fontSize: '1.5rem',
@@ -598,13 +652,25 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
   },
-  btnSmallSecondary: {
-    padding: '0.375rem 0.875rem',
-    backgroundColor: colors.background,
-    color: colors.textLight,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '20px',
-    fontSize: '0.75rem',
+  btnInfo: {
+    padding: '0.5rem 1rem',
+    background: '#4299e1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  btnSecondary: {
+    padding: '0.5rem 1rem',
+    background: '#a0aec0',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
     cursor: 'pointer',
   },
   btnIcon: { fontSize: '1rem' },

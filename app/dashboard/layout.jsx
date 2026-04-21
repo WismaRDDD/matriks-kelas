@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -11,8 +11,8 @@ export default function DashboardLayout({ children }) {
   const getActiveTab = () => {
     if (pathname.includes('/dosen')) return 'dosen';
     if (pathname.includes('/ruangan')) return 'ruangan';
-    if (pathname.includes('/kurikulum')) return 'kurikulum';
     if (pathname.includes('/kelas')) return 'kelas';
+    if (pathname.includes('/kurikulum')) return 'kurikulum';
     if (pathname.includes('/jadwal')) return 'jadwal';
     return '';
   };
@@ -21,8 +21,8 @@ export default function DashboardLayout({ children }) {
 
   const navItems = [
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
-    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
     { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
+    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
     { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
     { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
   ];

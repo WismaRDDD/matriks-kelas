@@ -55,6 +55,7 @@ export default function DosenPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showMessage = (type, text) => {
@@ -176,10 +177,15 @@ export default function DosenPage() {
     setShowForm(true);
   };
 
+  // Import Handlers
   const downloadTemplate = async () => {
     try {
       const res = await fetch('/api/dosen/import');
-      if (!res.ok) throw new Error('Download template gagal');
+      
+      if (!res.ok) {
+        throw new Error('Download template gagal');
+      }
+      
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -189,12 +195,14 @@ export default function DosenPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
       showMessage('success', '✅ Template berhasil diunduh');
     } catch (error) {
       showMessage('error', `❌ ${error.message}`);
     }
   };
 
+  // Import Data Handler
   const handleImport = async () => {
     if (!file) {
       showMessage('error', 'Pilih file terlebih dahulu');
@@ -208,10 +216,16 @@ export default function DosenPage() {
         method: 'POST',
         body: formData,
       });
+
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Import gagal');
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Import gagal');
+      }
+
       const summary = result.summary || result;
       const errorList = result.errors ? result.errors.slice(0, 5).join('\n') : '';
+      
       let message = `✅ Import selesai: ${summary.success} sukses, ${summary.failed} gagal, ${summary.duplicated || 0} duplikat`;
       if (errorList) {
         message += `\n\n⚠️ Beberapa error:\n${errorList}`;
@@ -219,6 +233,7 @@ export default function DosenPage() {
           message += `\n... dan ${result.errors.length - 5} error lainnya`;
         }
       }
+      
       showMessage('success', message);
       setFile(null);
       const fileInput = document.getElementById('fileInput');
@@ -255,8 +270,10 @@ export default function DosenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),
       });
+
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
+
       showMessage('success', `${selectedIds.length} data dosen berhasil dihapus`);
       setSelectedIds([]);
       fetchData();
@@ -273,8 +290,10 @@ export default function DosenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
+
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
+
       showMessage('success', 'Data dosen berhasil dihapus');
       fetchData();
     } catch (error) {
@@ -333,6 +352,34 @@ export default function DosenPage() {
     return '↓';
   };
 
+  // Add hover styles on client side only
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      button:hover {
+        opacity: 0.85;
+        transform: translateY(-1px);
+      }
+      
+      input:hover, select:hover, textarea:hover {
+        border-color: #667eea;
+      }
+      
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      
+      tr:hover {
+        background-color: #f7fafc !important;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -355,12 +402,18 @@ export default function DosenPage() {
 
         <div style={styles.toolbar}>
           <div style={styles.toolbarLeft}>
-            <button style={styles.btnPrimary} onClick={handleAddNew}>+ Dosen Baru</button>
-            <button style={styles.btnOutline} onClick={downloadTemplate}>📥 Template</button>
-            <button style={styles.btnOutline} onClick={() => document.getElementById('fileInput').click()}>📂 Import Excel</button>
-            {selectedIds.length > 0 && (
-              <button style={styles.btnDanger} onClick={handleDeleteSelected}>🗑️ Hapus ({selectedIds.length})</button>
-            )}
+            <button style={styles.btnPrimary} onClick={handleAddNew}>
+              ➕ Tambah Dosen
+            </button>
+            <button style={styles.btnSuccess} onClick={downloadTemplate}>
+              📥 Template Excel
+            </button>
+            <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
+              📂 Import Excel
+            </button>
+            <button style={styles.btnDanger} onClick={handleDeleteSelected}>
+              🗑️ Hapus ({selectedIds.length})
+            </button>
           </div>
         </div>
 
@@ -398,13 +451,15 @@ export default function DosenPage() {
                     <th style={styles.thCheckbox}>
                       <input type="checkbox" checked={selectedIds.length === sortedData.length && sortedData.length > 0} onChange={handleSelectAll} style={styles.checkbox} />
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nidn')}>NIDN {renderSortIcon('f_nidn')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_nip')}>NIP {renderSortIcon('f_nip')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>Nama Lengkap {renderSortIcon('f_namapegawai')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>Tempat Lahir {renderSortIcon('f_tempatlahir')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>Tanggal Lahir {renderSortIcon('f_tanggallahir')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>JK {renderSortIcon('f_jeniskelamin')}</th>
-                    <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>Prodi {renderSortIcon('f_progdi_id')}</th>
+                    <th style={styles.th} onClick={() => handleSort('prefer_lantai')}>
+                      Prefer Lantai {renderSortIcon('prefer_lantai')}
+                    </th>
+                    <th style={styles.th} onClick={() => handleSort('prefer_hari')}>
+                      Prefer Hari {renderSortIcon('prefer_hari')}
+                    </th>
+                    <th style={styles.th} onClick={() => handleSort('avoid_hari')}>
+                      Avoid Hari {renderSortIcon('avoid_hari')}
+                    </th>
                     <th style={styles.thAksi}>Aksi</th>
                   </tr>
                 </thead>
@@ -424,7 +479,18 @@ export default function DosenPage() {
                           {d.f_jeniskelamin === 'L' ? 'Laki-laki' : d.f_jeniskelamin === 'P' ? 'Perempuan' : '-'}
                         </span>
                       </td>
-                      <td style={styles.td}><span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span></td>
+                      <td style={styles.td}>
+                        <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
+                      </td>
+                      <td style={styles.td}>
+                        <span style={styles.badgeCode}>{d.prefer_lantai || '-'}</span>
+                      </td>
+                      <td style={styles.td}>
+                        <small>{d.prefer_hari ? d.prefer_hari.split(',').join(', ') : '-'}</small>
+                      </td>
+                      <td style={styles.td}>
+                        <small style={{ color: '#e53e3e', fontWeight: '500' }}>{d.avoid_hari || '-'}</small>
+                      </td>
                       <td style={styles.tdAksi}>
                         <button style={styles.btnIconEdit} onClick={() => handleEdit(d)} title="Edit">✏️</button>
                         <button style={styles.btnIconDelete} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">🗑️</button>
@@ -486,25 +552,60 @@ export default function DosenPage() {
                   <label style={styles.radioLabel}><input type="radio" name="f_jeniskelamin" value="P" checked={form.f_jeniskelamin === 'P'} onChange={handleChange} /> Perempuan</label>
                 </div>
               </div>
+
               <div style={styles.formGroup}>
                 <label style={styles.label}>Preferensi Lantai</label>
-                <input style={styles.input} name="prefer_lantai" value={form.prefer_lantai} onChange={handleChange} placeholder="Contoh: 1, 2, 3" />
+                <input
+                  style={styles.input}
+                  name="prefer_lantai"
+                  value={form.prefer_lantai}
+                  onChange={handleChange}
+                  placeholder="Contoh: 1, 2, 3"
+                />
               </div>
+
               <div style={styles.formGroup}>
                 <label style={styles.label}>Preferensi Hari</label>
-                <input style={styles.input} name="prefer_hari" value={form.prefer_hari} onChange={handleChange} placeholder="Contoh: Senin, Selasa, Rabu" />
+                <input
+                  style={styles.input}
+                  name="prefer_hari"
+                  value={form.prefer_hari}
+                  onChange={handleChange}
+                  placeholder="Contoh: Senin,Selasa,Rabu"
+                />
               </div>
+
               <div style={styles.formGroup}>
-                <label style={styles.label}>Hari Dihindari</label>
-                <input style={styles.input} name="avoid_hari" value={form.avoid_hari} onChange={handleChange} placeholder="Contoh: Jumat" />
+                <label style={styles.label}>Hari yang Dihindari</label>
+                <input
+                  style={styles.input}
+                  name="avoid_hari"
+                  value={form.avoid_hari}
+                  onChange={handleChange}
+                  placeholder="Contoh: Jumat"
+                />
               </div>
+
               <div style={styles.formGroup}>
-                <label style={styles.label}>Jam Mulai</label>
-                <input style={styles.input} type="time" name="prefer_jam_mulai" value={form.prefer_jam_mulai} onChange={handleChange} />
+                <label style={styles.label}>Jam Mulai Preferensi</label>
+                <input
+                  style={styles.input}
+                  type="time"
+                  name="prefer_jam_mulai"
+                  value={form.prefer_jam_mulai}
+                  onChange={handleChange}
+                />
               </div>
+
               <div style={styles.formGroup}>
-                <label style={styles.label}>Jam Selesai</label>
-                <input style={styles.input} type="time" name="prefer_jam_selesai" value={form.prefer_jam_selesai} onChange={handleChange} />
+                <label style={styles.label}>Jam Selesai Preferensi</label>
+                <input
+                  style={styles.input}
+                  type="time"
+                  name="prefer_jam_selesai"
+                  value={form.prefer_jam_selesai}
+                  onChange={handleChange}
+                />
               </div>
             </div>
             <div style={styles.modalActions}>
@@ -808,26 +909,3 @@ const styles = {
     cursor: 'pointer',
   },
 };
-
-// Add keyframes for spinner animation
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.textContent = `
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    button:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-    button:active {
-      transform: translateY(0);
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: ${colors.primary};
-      box-shadow: 0 0 0 3px rgba(244, 124, 56, 0.1);
-    }
-  `;
-  document.head.appendChild(styleSheet);
-}

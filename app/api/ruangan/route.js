@@ -3,44 +3,94 @@ import { NextResponse } from 'next/server';
 
 // GET: ambil semua ruangan
 export async function GET() {
-  const data = await knex('ruangan')
-    .select('*')
-    .orderBy('id', 'desc');
+  try {
+    const data = await knex('ruangan')
+      .select('*')
+      .orderBy('id', 'desc');
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error('❌ GET ruangan error:', err);
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
+  }
 }
 
 // POST: tambah ruangan manual
 export async function POST(req) {
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  await knex('ruangan').insert({
-    f_ruang_id: body.f_ruang_id,
-    f_koderuang: body.f_koderuang,
-    f_namaruang: body.f_namaruang,
-    f_kapasitas_kuliah: body.f_kapasitas_kuliah,
-    f_alamatruang: body.f_alamatruang,
-  });
+    if (!body.f_namaruang) {
+      return NextResponse.json(
+        { error: 'Nama ruangan diperlukan' },
+        { status: 400 }
+      );
+    }
 
-  return NextResponse.json({ success: true });
+    const result = await knex('ruangan').insert({
+      f_ruang_id: body.f_ruang_id || null,
+      f_koderuang: body.f_koderuang || null,
+      f_namaruang: body.f_namaruang,
+      f_kapasitas_kuliah: body.f_kapasitas_kuliah || null,
+      f_alamatruang: body.f_alamatruang || null,
+      lantai: body.lantai || null,
+    });
+
+    return NextResponse.json({
+      success: true,
+      id: result[0],
+      message: 'Ruangan berhasil ditambahkan'
+    });
+  } catch (err) {
+    console.error('❌ POST ruangan error:', err);
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
+  }
 }
 
 
-// PUT
-export async function PUT(req, { params }) {
-  const { id } = params;
-  const body = await req.json();
+// PUT: update ruangan
+export async function PUT(req) {
+  try {
+    const body = await req.json();
 
-  await knex('ruangan').where({ id }).update(body);
+    if (!body.id) {
+      return NextResponse.json(
+        { error: 'ID ruangan diperlukan' },
+        { status: 400 }
+      );
+    }
 
-  return NextResponse.json({ success: true });
-}
+    const ruanganExists = await knex('ruangan')
+      .where({ id: body.id })
+      .first();
 
-// DELETE
-export async function DELETE(req, { params }) {
-  const { id } = params;
+    if (!ruanganExists) {
+      return NextResponse.json(
+        { error: 'Ruangan tidak ditemukan' },
+        { status: 404 }
+      );
+    }
 
-  await knex('ruangan').where({ id }).del();
+    const updateData = { ...body };
+    delete updateData.id;
 
-  return NextResponse.json({ success: true });
+    await knex('ruangan').where({ id: body.id }).update(updateData);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Ruangan berhasil diupdate'
+    });
+  } catch (err) {
+    console.error('❌ PUT ruangan error:', err);
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
+  }
 }
