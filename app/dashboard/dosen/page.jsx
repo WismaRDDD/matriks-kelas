@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { colors, globalStyles } from '../../styles/upnvjTheme';
 
 export default function DosenPage() {
   const [data, setData] = useState([]);
@@ -15,6 +16,8 @@ export default function DosenPage() {
     direction: null,
   });
 
+  const [editingId, setEditingId] = useState(null);
+
   const [form, setForm] = useState({
     id: '',
     f_nidn: '',
@@ -26,23 +29,24 @@ export default function DosenPage() {
     f_tanggallahir: '',
     f_jeniskelamin: '',
     f_progdi_id: '',
+    prefer_lantai: '',
+    prefer_hari: '',
+    avoid_hari: '',
+    prefer_jam_mulai: '',
+    prefer_jam_selesai: '',
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
-  const [editingId, setEditingId] = useState(null);
 
-  // Fetch Data
   const fetchData = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/dosen');
       const json = await res.json();
-
       json.sort((a, b) => new Date(a.f_tanggallahir) - new Date(b.f_tanggallahir));
-
       setData(json);
       setSelectedIds([]);
-    } catch (error) {
+    } catch {
       showMessage('error', 'Gagal memuat data dosen');
     } finally {
       setLoading(false);
@@ -58,13 +62,11 @@ export default function DosenPage() {
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
   };
 
-  // Form Handlers
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async () => {
-    // Validations
     if (!form.f_nidn) {
       showMessage('error', 'NIDN wajib diisi');
       return;
@@ -77,7 +79,6 @@ export default function DosenPage() {
       showMessage('error', 'NIDN harus 10 atau 12 digit');
       return;
     }
-
     if (!form.f_nip) {
       showMessage('error', 'NIP wajib diisi');
       return;
@@ -86,20 +87,16 @@ export default function DosenPage() {
       showMessage('error', 'NIP harus berupa angka');
       return;
     }
-
     if (!form.f_namapegawai) {
       showMessage('error', 'Nama dosen wajib diisi');
       return;
     }
-
-    // Tanggal validation
     if (form.f_tanggallahir) {
       const date = new Date(form.f_tanggallahir);
       if (isNaN(date.getTime())) {
         showMessage('error', 'Tanggal lahir tidak valid');
         return;
       }
-      
       const year = date.getFullYear();
       const currentYear = new Date().getFullYear();
       if (year < 1950 || year > currentYear) {
@@ -107,15 +104,13 @@ export default function DosenPage() {
         return;
       }
     }
-
-    // Jenis kelamin validation
     if (form.f_jeniskelamin && !['L', 'P'].includes(form.f_jeniskelamin)) {
       showMessage('error', 'Jenis kelamin harus L atau P');
       return;
     }
 
     const method = form.id ? 'PUT' : 'POST';
-    const url = form.id ? `/api/dosen/${form.id}` : '/api/dosen';
+    const url = '/api/dosen';
 
     try {
       const res = await fetch(url, {
@@ -123,9 +118,7 @@ export default function DosenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-
       if (!res.ok) throw new Error('Gagal menyimpan data');
-
       showMessage('success', form.id ? 'Data dosen berhasil diupdate' : 'Data dosen berhasil ditambahkan');
       setShowForm(false);
       resetForm();
@@ -147,6 +140,11 @@ export default function DosenPage() {
       f_tanggallahir: '',
       f_jeniskelamin: '',
       f_progdi_id: '',
+      prefer_lantai: '',
+      prefer_hari: '',
+      avoid_hari: '',
+      prefer_jam_mulai: '',
+      prefer_jam_selesai: '',
     });
     setEditingId(null);
   };
@@ -168,47 +166,73 @@ export default function DosenPage() {
       f_tanggallahir: data.f_tanggallahir ? new Date(data.f_tanggallahir).toISOString().split('T')[0] : '',
       f_jeniskelamin: data.f_jeniskelamin || '',
       f_progdi_id: data.f_progdi_id || '',
+      prefer_lantai: data.prefer_lantai || '',
+      prefer_hari: data.prefer_hari || '',
+      avoid_hari: data.avoid_hari || '',
+      prefer_jam_mulai: data.prefer_jam_mulai || '',
+      prefer_jam_selesai: data.prefer_jam_selesai || '',
     });
     setEditingId(data.id);
     setShowForm(true);
   };
 
-  // Import Handlers
+  const downloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/dosen/import');
+      if (!res.ok) throw new Error('Download template gagal');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template-dosen.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showMessage('success', '✅ Template berhasil diunduh');
+    } catch (error) {
+      showMessage('error', `❌ ${error.message}`);
+    }
+  };
+
   const handleImport = async () => {
     if (!file) {
       showMessage('error', 'Pilih file terlebih dahulu');
       return;
     }
-
     const formData = new FormData();
     formData.append('file', file);
-
     setUploading(true);
     try {
       const res = await fetch('/api/dosen/import', {
         method: 'POST',
         body: formData,
       });
-
-      if (!res.ok) throw new Error('Import gagal');
-
-      showMessage('success', 'Import data dosen berhasil');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Import gagal');
+      const summary = result.summary || result;
+      const errorList = result.errors ? result.errors.slice(0, 5).join('\n') : '';
+      let message = `✅ Import selesai: ${summary.success} sukses, ${summary.failed} gagal, ${summary.duplicated || 0} duplikat`;
+      if (errorList) {
+        message += `\n\n⚠️ Beberapa error:\n${errorList}`;
+        if (result.errors.length > 5) {
+          message += `\n... dan ${result.errors.length - 5} error lainnya`;
+        }
+      }
+      showMessage('success', message);
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
       fetchData();
     } catch (error) {
-      showMessage('error', error.message);
+      showMessage('error', `❌ ${error.message}`);
     } finally {
       setUploading(false);
     }
   };
 
-  // Delete Handlers
   const handleSelect = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
   };
 
   const handleSelectAll = () => {
@@ -224,18 +248,15 @@ export default function DosenPage() {
       showMessage('error', 'Pilih data yang akan dihapus');
       return;
     }
-
     if (!confirm(`Hapus ${selectedIds.length} data dosen yang dipilih?`)) return;
-
     try {
       const res = await fetch('/api/dosen/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),
       });
-
-      if (!res.ok) throw new Error('Gagal menghapus data');
-
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
       showMessage('success', `${selectedIds.length} data dosen berhasil dihapus`);
       setSelectedIds([]);
       fetchData();
@@ -246,14 +267,14 @@ export default function DosenPage() {
 
   const handleDeleteOne = async (id, nama) => {
     if (!confirm(`Hapus dosen "${nama}"?`)) return;
-
     try {
-      const res = await fetch(`/api/dosen/${id}`, {
-        method: 'DELETE',
+      const res = await fetch('/api/dosen/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
       });
-
-      if (!res.ok) throw new Error('Gagal menghapus data');
-
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal menghapus data');
       showMessage('success', 'Data dosen berhasil dihapus');
       fetchData();
     } catch (error) {
@@ -261,7 +282,6 @@ export default function DosenPage() {
     }
   };
 
-  // Helper Functions
   function formatDateDisplay(value) {
     if (!value) return '-';
     return new Date(value).toLocaleDateString('id-ID', {
@@ -279,13 +299,11 @@ export default function DosenPage() {
     return nama;
   }
 
-  // Sort Function
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key !== key) return { key, direction: 'asc' };
       if (prev.direction === 'asc') return { key, direction: 'desc' };
-      if (prev.direction === 'desc') return { key: null, direction: null };
-      return { key, direction: 'asc' };
+      return { key: null, direction: null };
     });
   };
 
@@ -294,16 +312,13 @@ export default function DosenPage() {
     sortedData.sort((a, b) => {
       let aVal = a[sortConfig.key];
       let bVal = b[sortConfig.key];
-
       if (sortConfig.key === 'f_tanggallahir') {
         aVal = aVal ? new Date(aVal) : null;
         bVal = bVal ? new Date(bVal) : null;
       }
-
       if (!aVal && !bVal) return 0;
       if (!aVal) return 1;
       if (!bVal) return -1;
-
       if (sortConfig.direction === 'asc') {
         return aVal > bVal ? 1 : -1;
       } else {
@@ -315,66 +330,65 @@ export default function DosenPage() {
   const renderSortIcon = (key) => {
     if (sortConfig.key !== key) return '↕️';
     if (sortConfig.direction === 'asc') return '↑';
-    if (sortConfig.direction === 'desc') return '↓';
-    return '↕️';
+    return '↓';
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>👨‍🏫 Dashboard Dosen</h1>
-
-        {/* Message Display */}
-        {message.text && (
-          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>👨‍🏫 Data Dosen</h1>
+            <p style={styles.subtitle}>Kelola data dosen dan preferensi jadwal</p>
           </div>
-        )}
-
-        {/* Toolbar */}
-        <div style={styles.toolbar}>
-          <div style={styles.toolbarLeft}>
-            <button style={styles.btnPrimary} onClick={handleAddNew}>
-              ➕ Tambah Dosen
-            </button>
-            <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
-              📂 Import Excel
-            </button>
-            <button style={styles.btnDanger} onClick={handleDeleteSelected}>
-              🗑️ Hapus ({selectedIds.length})
-            </button>
+          <div style={styles.statsBadge}>
+            <span style={styles.statsNumber}>{data.length}</span>
+            <span style={styles.statsLabel}>Total Dosen</span>
           </div>
         </div>
 
-        {/* File Upload Section */}
+        {message.text && (
+          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
+            {message.type === 'success' ? '✓' : '✗'} {message.text}
+          </div>
+        )}
+
+        <div style={styles.toolbar}>
+          <div style={styles.toolbarLeft}>
+            <button style={styles.btnPrimary} onClick={handleAddNew}>+ Dosen Baru</button>
+            <button style={styles.btnOutline} onClick={downloadTemplate}>📥 Template</button>
+            <button style={styles.btnOutline} onClick={() => document.getElementById('fileInput').click()}>📂 Import Excel</button>
+            {selectedIds.length > 0 && (
+              <button style={styles.btnDanger} onClick={handleDeleteSelected}>🗑️ Hapus ({selectedIds.length})</button>
+            )}
+          </div>
+        </div>
+
         {file && (
           <div style={styles.fileInfo}>
             <span>📎 {file.name}</span>
-            <button style={styles.btnSuccess} onClick={handleImport} disabled={uploading}>
-              {uploading ? '⏳ Mengupload...' : '📤 Upload'}
-            </button>
-            <button style={styles.btnSecondary} onClick={() => setFile(null)}>
-              ❌ Batal
-            </button>
+            <div style={styles.fileActions}>
+              <button style={styles.btnSmallPrimary} onClick={handleImport} disabled={uploading}>
+                {uploading ? '⏳ Mengupload...' : '📤 Upload'}
+              </button>
+              <button style={styles.btnSmallSecondary} onClick={() => setFile(null)}>Batal</button>
+            </div>
           </div>
         )}
 
         <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => setFile(e.target.files[0])} />
 
-        {/* Table Section */}
         <div style={styles.tableWrapper}>
-          <div style={styles.tableHeader}>
-            <h2>📋 Daftar Dosen</h2>
-            <span style={styles.badge}>Total: {data.length} dosen</span>
-          </div>
-
           {loading ? (
-            <div style={styles.loading}>⏳ Memuat data...</div>
+            <div style={styles.loading}>
+              <div style={styles.spinner}></div>
+              <p>Memuat data dosen...</p>
+            </div>
           ) : data.length === 0 ? (
             <div style={styles.emptyState}>
-              <span style={styles.emptyIcon}>📭</span>
+              <div style={styles.emptyIcon}>📭</div>
               <p>Belum ada data dosen</p>
-              <small>Klik &quot;Tambah Dosen&quot; atau import dari Excel</small>
+              <small>Klik "Dosen Baru" atau import dari Excel untuk memulai</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>
@@ -382,34 +396,15 @@ export default function DosenPage() {
                 <thead>
                   <tr style={styles.tableHeaderRow}>
                     <th style={styles.thCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.length === sortedData.length && sortedData.length > 0}
-                        onChange={handleSelectAll}
-                        style={styles.checkbox}
-                      />
+                      <input type="checkbox" checked={selectedIds.length === sortedData.length && sortedData.length > 0} onChange={handleSelectAll} style={styles.checkbox} />
                     </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nidn')}>
-                      NIDN {renderSortIcon('f_nidn')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nip')}>
-                      NIP {renderSortIcon('f_nip')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>
-                      Nama Lengkap {renderSortIcon('f_namapegawai')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>
-                      Tempat Lahir {renderSortIcon('f_tempatlahir')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>
-                      Tanggal Lahir {renderSortIcon('f_tanggallahir')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>
-                      JK {renderSortIcon('f_jeniskelamin')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>
-                      Prodi ID {renderSortIcon('f_progdi_id')}
-                    </th>
+                    <th style={styles.th} onClick={() => handleSort('f_nidn')}>NIDN {renderSortIcon('f_nidn')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_nip')}>NIP {renderSortIcon('f_nip')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>Nama Lengkap {renderSortIcon('f_namapegawai')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>Tempat Lahir {renderSortIcon('f_tempatlahir')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>Tanggal Lahir {renderSortIcon('f_tanggallahir')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>JK {renderSortIcon('f_jeniskelamin')}</th>
+                    <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>Prodi {renderSortIcon('f_progdi_id')}</th>
                     <th style={styles.thAksi}>Aksi</th>
                   </tr>
                 </thead>
@@ -417,44 +412,27 @@ export default function DosenPage() {
                   {sortedData.map((d, index) => (
                     <tr key={d.id} style={index % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
                       <td style={styles.tdCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(d.id)}
-                          onChange={() => handleSelect(d.id)}
-                          style={styles.checkbox}
-                        />
+                        <input type="checkbox" checked={selectedIds.includes(d.id)} onChange={() => handleSelect(d.id)} style={styles.checkbox} />
                       </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeCode}>{d.f_nidn}</span>
-                      </td>
+                      <td style={styles.td}><span style={styles.badgeCode}>{d.f_nidn}</span></td>
                       <td style={styles.td}>{d.f_nip}</td>
-                      <td style={styles.td}>
-                        <strong>{formatNamaLengkap(d)}</strong>
-                      </td>
+                      <td style={styles.td}><strong>{formatNamaLengkap(d)}</strong></td>
                       <td style={styles.td}>{d.f_tempatlahir || '-'}</td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeDate}>{formatDateDisplay(d.f_tanggallahir)}</span>
-                      </td>
+                      <td style={styles.td}><span style={styles.badgeDate}>{formatDateDisplay(d.f_tanggallahir)}</span></td>
                       <td style={styles.td}>
                         <span style={d.f_jeniskelamin === 'L' ? styles.badgeMale : styles.badgeFemale}>
-                          {d.f_jeniskelamin === 'L' ? '♂ Laki-laki' : d.f_jeniskelamin === 'P' ? '♀ Perempuan' : '-'}
+                          {d.f_jeniskelamin === 'L' ? 'Laki-laki' : d.f_jeniskelamin === 'P' ? 'Perempuan' : '-'}
                         </span>
                       </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
-                      </td>
+                      <td style={styles.td}><span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span></td>
                       <td style={styles.tdAksi}>
-                        <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit">
-                          ✏️
-                        </button>
-                        <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">
-                          🗑️
-                        </button>
+                        <button style={styles.btnIconEdit} onClick={() => handleEdit(d)} title="Edit">✏️</button>
+                        <button style={styles.btnIconDelete} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">🗑️</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-               </table>
+              </table>
             </div>
           )}
         </div>
@@ -464,135 +442,74 @@ export default function DosenPage() {
       {showForm && (
         <div style={styles.modal} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>
-              {form.id ? '✏️ Edit Dosen' : '➕ Tambah Dosen'}
-            </h3>
-
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>{form.id ? '✏️ Edit Dosen' : '➕ Tambah Dosen'}</h3>
+              <button style={styles.modalClose} onClick={() => setShowForm(false)}>×</button>
+            </div>
             <div style={styles.formGrid}>
               <div style={styles.formGroup}>
-                <label style={styles.label}>NIDN *</label>
-                <input
-                  style={styles.input}
-                  name="f_nidn"
-                  value={form.f_nidn}
-                  onChange={handleChange}
-                  placeholder="10 atau 12 digit angka"
-                  disabled={!!form.id}
-                  maxLength="12"
-                />
+                <label style={styles.label}>NIDN <span style={styles.required}>*</span></label>
+                <input style={styles.input} name="f_nidn" value={form.f_nidn} onChange={handleChange} placeholder="10 atau 12 digit angka" disabled={!!form.id} maxLength="12" />
               </div>
-
               <div style={styles.formGroup}>
-                <label style={styles.label}>NIP *</label>
-                <input
-                  style={styles.input}
-                  name="f_nip"
-                  value={form.f_nip}
-                  onChange={handleChange}
-                  placeholder="Nomor Induk Pegawai"
-                />
+                <label style={styles.label}>NIP <span style={styles.required}>*</span></label>
+                <input style={styles.input} name="f_nip" value={form.f_nip} onChange={handleChange} placeholder="Nomor Induk Pegawai" />
               </div>
-
               <div style={styles.formGroup}>
                 <label style={styles.label}>Gelar Depan</label>
-                <input
-                  style={styles.input}
-                  name="f_title_depan"
-                  value={form.f_title_depan}
-                  onChange={handleChange}
-                  placeholder="Contoh: Dr., Prof."
-                />
+                <input style={styles.input} name="f_title_depan" value={form.f_title_depan} onChange={handleChange} placeholder="Contoh: Dr., Prof." />
               </div>
-
               <div style={styles.formGroup}>
-                <label style={styles.label}>Nama Dosen *</label>
-                <input
-                  style={styles.input}
-                  name="f_namapegawai"
-                  value={form.f_namapegawai}
-                  onChange={handleChange}
-                  placeholder="Nama lengkap"
-                />
+                <label style={styles.label}>Nama Dosen <span style={styles.required}>*</span></label>
+                <input style={styles.input} name="f_namapegawai" value={form.f_namapegawai} onChange={handleChange} placeholder="Nama lengkap" />
               </div>
-
               <div style={styles.formGroup}>
                 <label style={styles.label}>Gelar Belakang</label>
-                <input
-                  style={styles.input}
-                  name="f_title_belakang"
-                  value={form.f_title_belakang}
-                  onChange={handleChange}
-                  placeholder="Contoh: M.Kom., Ph.D"
-                />
+                <input style={styles.input} name="f_title_belakang" value={form.f_title_belakang} onChange={handleChange} placeholder="Contoh: M.Kom., Ph.D" />
               </div>
-
               <div style={styles.formGroup}>
                 <label style={styles.label}>Tempat Lahir</label>
-                <input
-                  style={styles.input}
-                  name="f_tempatlahir"
-                  value={form.f_tempatlahir}
-                  onChange={handleChange}
-                  placeholder="Kota tempat lahir"
-                />
+                <input style={styles.input} name="f_tempatlahir" value={form.f_tempatlahir} onChange={handleChange} placeholder="Kota tempat lahir" />
               </div>
-
               <div style={styles.formGroup}>
                 <label style={styles.label}>Tanggal Lahir</label>
-                <input
-                  style={styles.input}
-                  type="date"
-                  name="f_tanggallahir"
-                  value={form.f_tanggallahir}
-                  onChange={handleChange}
-                />
+                <input style={styles.input} type="date" name="f_tanggallahir" value={form.f_tanggallahir} onChange={handleChange} />
               </div>
-
               <div style={styles.formGroup}>
-                <label style={styles.label}>Program Studi ID</label>
-                <input
-                  style={styles.input}
-                  name="f_progdi_id"
-                  value={form.f_progdi_id}
-                  onChange={handleChange}
-                  placeholder="ID Program Studi"
-                />
+                <label style={styles.label}>Program Studi</label>
+                <input style={styles.input} name="f_progdi_id" value={form.f_progdi_id} onChange={handleChange} placeholder="ID Program Studi" />
               </div>
-
               <div style={styles.formGroup}>
                 <label style={styles.label}>Jenis Kelamin</label>
                 <div style={styles.radioGroup}>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="L"
-                      checked={form.f_jeniskelamin === 'L'}
-                      onChange={handleChange}
-                    />
-                    <span>♂ Laki-laki</span>
-                  </label>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="P"
-                      checked={form.f_jeniskelamin === 'P'}
-                      onChange={handleChange}
-                    />
-                    <span>♀ Perempuan</span>
-                  </label>
+                  <label style={styles.radioLabel}><input type="radio" name="f_jeniskelamin" value="L" checked={form.f_jeniskelamin === 'L'} onChange={handleChange} /> Laki-laki</label>
+                  <label style={styles.radioLabel}><input type="radio" name="f_jeniskelamin" value="P" checked={form.f_jeniskelamin === 'P'} onChange={handleChange} /> Perempuan</label>
                 </div>
               </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Preferensi Lantai</label>
+                <input style={styles.input} name="prefer_lantai" value={form.prefer_lantai} onChange={handleChange} placeholder="Contoh: 1, 2, 3" />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Preferensi Hari</label>
+                <input style={styles.input} name="prefer_hari" value={form.prefer_hari} onChange={handleChange} placeholder="Contoh: Senin, Selasa, Rabu" />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Hari Dihindari</label>
+                <input style={styles.input} name="avoid_hari" value={form.avoid_hari} onChange={handleChange} placeholder="Contoh: Jumat" />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Jam Mulai</label>
+                <input style={styles.input} type="time" name="prefer_jam_mulai" value={form.prefer_jam_mulai} onChange={handleChange} />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Jam Selesai</label>
+                <input style={styles.input} type="time" name="prefer_jam_selesai" value={form.prefer_jam_selesai} onChange={handleChange} />
+              </div>
             </div>
-
             <div style={styles.modalActions}>
-              <button style={styles.btnPrimary} onClick={handleSubmit}>
-                💾 Simpan
-              </button>
-              <button style={styles.btnSecondary} onClick={() => setShowForm(false)}>
-                ❌ Batal
-              </button>
+              <button style={styles.btnPrimary} onClick={handleSubmit}>Simpan</button>
+              <button style={styles.btnSecondary} onClick={() => setShowForm(false)}>Batal</button>
             </div>
           </div>
         </div>
@@ -601,267 +518,221 @@ export default function DosenPage() {
   );
 }
 
-// ================= STYLES =================
+// At the very bottom of page.jsx, replace the existing styles with:
+
 const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '2rem',
-  },
-  card: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-    padding: '2rem',
-  },
-  title: {
-    fontSize: '2rem',
-    color: '#333',
+  container: globalStyles.container,
+  card: globalStyles.card,
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: '2rem',
-    borderBottom: '3px solid #667eea',
-    paddingBottom: '0.5rem',
-    display: 'inline-block',
+    flexWrap: 'wrap',
+    gap: '1rem',
   },
-  message: {
-    padding: '1rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    fontWeight: '500',
+  title: globalStyles.title,
+  subtitle: globalStyles.subtitle,
+  statsBadge: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.5rem',
+    backgroundColor: colors.background,
+    padding: '0.5rem 1rem',
+    borderRadius: '40px',
   },
-  messageSuccess: {
-    backgroundColor: '#c6f6d5',
-    color: '#22543d',
-    border: '1px solid #9ae6b4',
+  statsNumber: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: colors.primary,
   },
-  messageError: {
-    backgroundColor: '#fed7d7',
-    color: '#742a2a',
-    border: '1px solid #fc8181',
+  statsLabel: {
+    fontSize: '0.75rem',
+    color: colors.textLight,
   },
+  message: globalStyles.message,
+  messageSuccess: globalStyles.messageSuccess,
+  messageError: globalStyles.messageError,
   toolbar: {
     marginBottom: '1.5rem',
-    padding: '1rem',
-    backgroundColor: '#f7f9fc',
-    borderRadius: '12px',
+    paddingBottom: '1rem',
+    borderBottom: `1px solid ${colors.border}`,
   },
   toolbarLeft: {
     display: 'flex',
     gap: '0.75rem',
     flexWrap: 'wrap',
   },
-  btnPrimary: {
-    padding: '0.5rem 1rem',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  btnSuccess: {
-    padding: '0.5rem 1rem',
-    background: '#48bb78',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  btnDanger: {
-    padding: '0.5rem 1rem',
-    background: '#f56565',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  btnSecondary: {
-    padding: '0.5rem 1rem',
-    background: '#a0aec0',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  fileInfo: {
-    backgroundColor: '#edf2f7',
-    padding: '0.75rem 1rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    display: 'flex',
-    gap: '0.75rem',
+  btnPrimary: globalStyles.btnPrimary,
+  btnOutline: {
+    display: 'inline-flex',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    gap: '0.5rem',
+    padding: '0.625rem 1.25rem',
+    backgroundColor: 'transparent',
+    color: colors.secondary,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '40px',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    cursor: 'pointer',
   },
-  tableWrapper: {
-    marginTop: '1.5rem',
+  btnDanger: globalStyles.btnDanger,
+  btnSecondary: globalStyles.btnSecondary,
+  btnSmallPrimary: {
+    padding: '0.375rem 0.875rem',
+    backgroundColor: colors.primary,
+    color: 'white',
+    border: 'none',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
   },
-  tableHeader: {
+  btnSmallSecondary: {
+    padding: '0.375rem 0.875rem',
+    backgroundColor: colors.background,
+    color: colors.textLight,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    cursor: 'pointer',
+  },
+  btnIcon: { fontSize: '1rem' },
+  fileInfo: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '1rem',
-    padding: '0 0.5rem',
+    backgroundColor: colors.background,
+    padding: '0.75rem 1rem',
+    borderRadius: '12px',
+    marginBottom: '1.5rem',
+    flexWrap: 'wrap',
+    gap: '0.75rem',
   },
-  badge: {
-    backgroundColor: '#e2e8f0',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    color: '#4a5568',
+  fileName: { fontSize: '0.875rem', color: colors.text },
+  fileActions: { display: 'flex', gap: '0.5rem' },
+  tableWrapper: { marginTop: '1rem' },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '3rem',
+    color: colors.textLight,
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: `3px solid ${colors.border}`,
+    borderTopColor: colors.primary,
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    marginBottom: '1rem',
   },
   emptyState: {
     textAlign: 'center',
     padding: '3rem',
-    backgroundColor: '#f7fafc',
-    borderRadius: '12px',
-    color: '#a0aec0',
+    backgroundColor: colors.background,
+    borderRadius: '16px',
+    color: colors.textLight,
   },
-  emptyIcon: {
-    fontSize: '3rem',
-    display: 'block',
-    marginBottom: '1rem',
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '3rem',
-    color: '#718096',
-    fontSize: '1.1rem',
-  },
+  emptyIcon: { fontSize: '3rem', display: 'block', marginBottom: '1rem' },
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    border: `1px solid ${colors.border}`,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBg,
   },
   tableHeaderRow: {
-    backgroundColor: '#f7fafc',
-    borderBottom: '2px solid #e2e8f0',
+    backgroundColor: colors.background,
+    borderBottom: `1px solid ${colors.border}`,
   },
   th: {
     padding: '1rem',
     textAlign: 'left',
     fontWeight: '600',
-    color: '#4a5568',
-    fontSize: '0.875rem',
+    color: colors.text,
+    fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     cursor: 'pointer',
-    userSelect: 'none',
   },
-  thCheckbox: {
-    padding: '1rem',
-    width: '40px',
-    textAlign: 'center',
-  },
-  thAksi: {
-    padding: '1rem',
-    width: '100px',
-    textAlign: 'center',
-  },
-  td: {
-    padding: '1rem',
-    color: '#2d3748',
-  },
-  tdCheckbox: {
-    padding: '1rem',
-    textAlign: 'center',
-  },
-  tdAksi: {
-    padding: '1rem',
-    textAlign: 'center',
-    whiteSpace: 'nowrap',
-  },
-  tableRow: {
-    borderBottom: '1px solid #e2e8f0',
-    transition: 'background-color 0.2s',
-  },
+  thCheckbox: { padding: '1rem', width: '40px', textAlign: 'center' },
+  thAksi: { padding: '1rem', width: '100px', textAlign: 'center' },
+  td: { padding: '1rem', color: colors.text, fontSize: '0.875rem' },
+  tdCheckbox: { padding: '1rem', textAlign: 'center' },
+  tdAksi: { padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' },
+  tableRow: { borderBottom: `1px solid ${colors.border}` },
   tableRowEven: {
-    backgroundColor: '#fafafa',
-    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#FCFCFD',
+    borderBottom: `1px solid ${colors.border}`,
   },
   checkbox: {
     cursor: 'pointer',
     width: '18px',
     height: '18px',
+    accentColor: colors.primary,
   },
   badgeCode: {
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
+    fontFamily: 'monospace',
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     fontWeight: '500',
-    display: 'inline-block',
-    fontFamily: 'monospace',
   },
   badgeDate: {
-    backgroundColor: '#fef5e7',
-    color: '#c05621',
+    backgroundColor: '#E0E7FF',
+    color: '#3730A3',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
+    fontSize: '0.75rem',
   },
   badgeMale: {
-    backgroundColor: '#bee3f8',
-    color: '#2c5282',
+    backgroundColor: '#DBEAFE',
+    color: '#1E40AF',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
+    fontSize: '0.75rem',
   },
   badgeFemale: {
-    backgroundColor: '#fed7e2',
-    color: '#97266d',
+    backgroundColor: '#FCE7F3',
+    color: '#9D174D',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
+    fontSize: '0.75rem',
   },
   badgeProdi: {
-    backgroundColor: '#e6fffa',
-    color: '#234e52',
+    backgroundColor: '#D1FAE5',
+    color: '#065F46',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
-    display: 'inline-block',
+    fontSize: '0.75rem',
   },
-  btnIconPrimary: {
+  btnIconEdit: {
     background: 'none',
     border: 'none',
-    fontSize: '1.25rem',
+    fontSize: '1.125rem',
     cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
+    padding: '0.375rem',
+    borderRadius: '8px',
     marginRight: '0.5rem',
+    color: colors.textLight,
   },
-  btnIconDanger: {
+  btnIconDelete: {
     background: 'none',
     border: 'none',
-    fontSize: '1.25rem',
+    fontSize: '1.125rem',
     cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
+    padding: '0.375rem',
+    borderRadius: '8px',
+    color: colors.textLight,
   },
   modal: {
     position: 'fixed',
@@ -869,89 +740,94 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '12px',
-    minWidth: '600px',
-    maxWidth: '90vw',
+    backgroundColor: colors.cardBg,
+    borderRadius: '24px',
+    width: '90%',
+    maxWidth: '800px',
     maxHeight: '90vh',
     overflowY: 'auto',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1.25rem 1.5rem',
+    borderBottom: `1px solid ${colors.border}`,
   },
   modalTitle: {
+    fontSize: '1.125rem',
+    fontWeight: '600',
+    color: colors.secondary,
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
     fontSize: '1.5rem',
-    marginBottom: '1.5rem',
-    color: '#333',
+    cursor: 'pointer',
+    color: colors.textLight,
   },
   modalActions: {
     display: 'flex',
-    gap: '1rem',
     justifyContent: 'flex-end',
-    marginTop: '1.5rem',
+    gap: '1rem',
+    padding: '1rem 1.5rem 1.5rem',
+    borderTop: `1px solid ${colors.border}`,
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem',
+    padding: '1.5rem',
   },
   formGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.5rem',
+    gap: '0.375rem',
   },
-  label: {
-    fontWeight: '500',
-    color: '#4a5568',
-    fontSize: '0.875rem',
-  },
-  input: {
-    padding: '0.75rem',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
-    fontSize: '0.9rem',
-    transition: 'border-color 0.2s',
+  required: {
+    color: colors.danger,
   },
   radioGroup: {
     display: 'flex',
-    gap: '1rem',
-    padding: '0.5rem 0',
+    gap: '1.5rem',
   },
   radioLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
+    fontSize: '0.875rem',
     cursor: 'pointer',
-    fontSize: '0.9rem',
   },
 };
 
-// Add hover styles (can be added via CSS or inline)
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  button:hover {
-    opacity: 0.85;
-    transform: translateY(-1px);
-  }
-  
-  input:hover, select:hover, textarea:hover {
-    border-color: #667eea;
-  }
-  
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-  
-  tr:hover {
-    background-color: #f7fafc !important;
-  }
-`;
-document.head.appendChild(styleSheet);
+// Add keyframes for spinner animation
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: ${colors.primary};
+      box-shadow: 0 0 0 3px rgba(244, 124, 56, 0.1);
+    }
+  `;
+  document.head.appendChild(styleSheet);
+}
