@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { colors, globalStyles } from '../../styles/upnvjTheme';
 
 export default function RuanganPage() {
   const [data, setData] = useState([]);
@@ -58,7 +59,6 @@ export default function RuanganPage() {
   };
 
   const handleSubmit = async () => {
-    // Validations
     if (!form.f_koderuang) {
       showMessage('error', 'Kode ruangan wajib diisi');
       return;
@@ -245,11 +245,11 @@ export default function RuanganPage() {
     setSortConfig((prev) => {
       if (prev.key !== key) return { key, direction: 'asc' };
       if (prev.direction === 'asc') return { key, direction: 'desc' };
-      if (prev.direction === 'desc') return { key: null, direction: null };
-      return { key, direction: 'asc' };
+      return { key: null, direction: null };
     });
   };
 
+  // MOVED THIS AFTER data IS DEFINED - This is the fix!
   const sortedData = [...data];
   if (sortConfig.key) {
     sortedData.sort((a, b) => {
@@ -270,20 +270,27 @@ export default function RuanganPage() {
 
   const renderSortIcon = (key) => {
     if (sortConfig.key !== key) return '↕️';
-    if (sortConfig.direction === 'asc') return '↑';
-    if (sortConfig.direction === 'desc') return '↓';
-    return '↕️';
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>🏢 Dashboard Ruangan</h1>
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>🏢 Dashboard Ruangan</h1>
+            <p style={styles.subtitle}>Kelola data ruangan perkuliahan</p>
+          </div>
+          <div style={styles.statsBadge}>
+            <span style={styles.statsNumber}>{data.length}</span>
+            <span style={styles.statsLabel}>Total Ruangan</span>
+          </div>
+        </div>
 
         {/* Message Display */}
         {message.text && (
-          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError), whiteSpace: 'pre-line' }}>
+            {message.type === 'success' ? '✓' : '✗'} {message.text}
           </div>
         )}
 
@@ -291,7 +298,7 @@ export default function RuanganPage() {
         <div style={styles.toolbar}>
           <div style={styles.toolbarLeft}>
             <button style={styles.btnPrimary} onClick={handleAddNew}>
-              ➕ Tambah Ruangan
+              <span style={styles.btnIcon}>+</span> Tambah Ruangan
             </button>
             <button style={styles.btnInfo} onClick={handleDownloadTemplate}>
               📥 Download Template
@@ -299,22 +306,29 @@ export default function RuanganPage() {
             <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
               📂 Import Excel
             </button>
-            <button style={styles.btnDanger} onClick={handleDeleteSelected}>
-              🗑️ Hapus ({selectedIds.length})
+            <button style={styles.btnOutline} onClick={() => document.getElementById('fileInput').click()}>
+              <span style={styles.btnIcon}>📂</span> Import Excel
             </button>
+            {selectedIds.length > 0 && (
+              <button style={styles.btnDanger} onClick={handleDeleteSelected}>
+                <span style={styles.btnIcon}>🗑️</span> Hapus ({selectedIds.length})
+              </button>
+            )}
           </div>
         </div>
 
         {/* File Upload Section */}
         {file && (
           <div style={styles.fileInfo}>
-            <span>📎 {file.name}</span>
-            <button style={styles.btnSuccess} onClick={handleImport} disabled={uploading}>
-              {uploading ? '⏳ Mengupload...' : '📤 Upload'}
-            </button>
-            <button style={styles.btnSecondary} onClick={() => setFile(null)}>
-              ❌ Batal
-            </button>
+            <span style={styles.fileName}>📎 {file.name}</span>
+            <div style={styles.fileActions}>
+              <button style={styles.btnSmallPrimary} onClick={handleImport} disabled={uploading}>
+                {uploading ? '⏳ Mengupload...' : '📤 Upload'}
+              </button>
+              <button style={styles.btnSmallSecondary} onClick={() => setFile(null)}>
+                Batal
+              </button>
+            </div>
           </div>
         )}
 
@@ -323,17 +337,20 @@ export default function RuanganPage() {
         {/* Table Section */}
         <div style={styles.tableWrapper}>
           <div style={styles.tableHeader}>
-            <h2>📋 Daftar Ruangan</h2>
+            <h2 style={styles.sectionTitle}>📋 Daftar Ruangan</h2>
             <span style={styles.badge}>Total: {data.length} ruangan</span>
           </div>
 
           {loading ? (
-            <div style={styles.loading}>⏳ Memuat data...</div>
+            <div style={styles.loading}>
+              <div style={styles.spinner}></div>
+              <p>Memuat data ruangan...</p>
+            </div>
           ) : data.length === 0 ? (
             <div style={styles.emptyState}>
               <span style={styles.emptyIcon}>📭</span>
               <p>Belum ada data ruangan</p>
-              <small>Klik &quot;Tambah Ruangan&quot; atau import dari Excel</small>
+              <small>Klik "Tambah Ruangan" atau import dari Excel</small>
             </div>
           ) : (
             <div style={styles.tableContainer}>
@@ -395,10 +412,10 @@ export default function RuanganPage() {
                       </td>
                       <td style={styles.td}>{d.f_alamatruang || '-'}</td>
                       <td style={styles.tdAksi}>
-                        <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit">
+                        <button style={styles.btnIconEdit} onClick={() => handleEdit(d)} title="Edit">
                           ✏️
                         </button>
-                        <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namaruang)} title="Hapus">
+                        <button style={styles.btnIconDelete} onClick={() => handleDeleteOne(d.id, d.f_namaruang)} title="Hapus">
                           🗑️
                         </button>
                       </td>
@@ -413,7 +430,7 @@ export default function RuanganPage() {
 
       {/* Modal Form */}
       {showForm && (
-        <div style={styles.modal} onClick={() => setShowForm(false)}>
+        <div style={styles.modalOverlay} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>
               {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
@@ -475,25 +492,86 @@ export default function RuanganPage() {
                 placeholder="ID ruangan"
               />
             </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Kode Ruangan <span style={styles.required}>*</span></label>
+                <input
+                  style={styles.input}
+                  name="f_koderuang"
+                  value={form.f_koderuang}
+                  onChange={handleChange}
+                  placeholder="Contoh: R-101"
+                />
+              </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Alamat</label>
-              <textarea
-                style={styles.textarea}
-                name="f_alamatruang"
-                value={form.f_alamatruang}
-                onChange={handleChange}
-                placeholder="Alamat atau lokasi ruangan"
-                rows="3"
-              />
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Nama Ruangan <span style={styles.required}>*</span></label>
+                <input
+                  style={styles.input}
+                  name="f_namaruang"
+                  value={form.f_namaruang}
+                  onChange={handleChange}
+                  placeholder="Contoh: Ruang Kelas A"
+                />
+              </div>
+
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Kapasitas</label>
+                  <input
+                    style={styles.input}
+                    name="f_kapasitas_kuliah"
+                    value={form.f_kapasitas_kuliah}
+                    onChange={handleChange}
+                    placeholder="Jumlah kapasitas"
+                    type="number"
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Lantai</label>
+                  <input
+                    style={styles.input}
+                    name="lantai"
+                    value={form.lantai}
+                    onChange={handleChange}
+                    placeholder="Nomor lantai"
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>ID Ruang</label>
+                <input
+                  style={styles.input}
+                  name="f_ruang_id"
+                  value={form.f_ruang_id}
+                  onChange={handleChange}
+                  placeholder="ID ruangan"
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Alamat</label>
+                <textarea
+                  style={styles.textarea}
+                  name="f_alamatruang"
+                  value={form.f_alamatruang}
+                  onChange={handleChange}
+                  placeholder="Alamat atau lokasi ruangan"
+                  rows="3"
+                />
+              </div>
             </div>
 
-            <div style={styles.modalActions}>
-              <button style={styles.btnPrimary} onClick={handleSubmit}>
-                💾 Simpan
-              </button>
+            <div style={styles.modalFooter}>
               <button style={styles.btnSecondary} onClick={() => setShowForm(false)}>
-                ❌ Batal
+                Batal
+              </button>
+              <button style={styles.btnPrimary} onClick={handleSubmit}>
+                Simpan
               </button>
             </div>
           </div>
@@ -503,28 +581,18 @@ export default function RuanganPage() {
   );
 }
 
-// ================= STYLES =================
+// ================= UPNVJ THEME STYLES =================
 const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '2rem',
-  },
-  card: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-    padding: '2rem',
-  },
-  title: {
-    fontSize: '2rem',
-    color: '#333',
+  container: globalStyles.container,
+  card: globalStyles.card,
+  
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: '2rem',
-    borderBottom: '3px solid #667eea',
-    paddingBottom: '0.5rem',
-    display: 'inline-block',
+    flexWrap: 'wrap',
+    gap: '1rem',
   },
   message: {
     padding: '1rem',
@@ -533,59 +601,56 @@ const styles = {
     fontWeight: '500',
     whiteSpace: 'pre-line',
   },
-  messageSuccess: {
-    backgroundColor: '#c6f6d5',
-    color: '#22543d',
-    border: '1px solid #9ae6b4',
+  statsNumber: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: colors.primary,
   },
-  messageError: {
-    backgroundColor: '#fed7d7',
-    color: '#742a2a',
-    border: '1px solid #fc8181',
+  statsLabel: {
+    fontSize: '0.75rem',
+    color: colors.textLight,
   },
+  
+  message: globalStyles.message,
+  messageSuccess: globalStyles.messageSuccess,
+  messageError: globalStyles.messageError,
+  
   toolbar: {
     marginBottom: '1.5rem',
-    padding: '1rem',
-    backgroundColor: '#f7f9fc',
-    borderRadius: '12px',
+    paddingBottom: '1rem',
+    borderBottom: `1px solid ${colors.border}`,
   },
   toolbarLeft: {
     display: 'flex',
     gap: '0.75rem',
     flexWrap: 'wrap',
   },
-  btnPrimary: {
-    padding: '0.5rem 1rem',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
+  
+  btnPrimary: globalStyles.btnPrimary,
+  btnOutline: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.625rem 1.25rem',
+    backgroundColor: 'transparent',
+    color: colors.secondary,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '40px',
+    fontSize: '0.875rem',
     fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
   },
-  btnSuccess: {
-    padding: '0.5rem 1rem',
-    background: '#48bb78',
+  btnDanger: globalStyles.btnDanger,
+  btnSecondary: globalStyles.btnSecondary,
+  btnSmallPrimary: {
+    padding: '0.375rem 0.875rem',
+    backgroundColor: colors.primary,
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
     fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  btnDanger: {
-    padding: '0.5rem 1rem',
-    background: '#f56565',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
   },
   btnInfo: {
     padding: '0.5rem 1rem',
@@ -607,218 +672,266 @@ const styles = {
     fontSize: '0.9rem',
     fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
   },
+  btnIcon: { fontSize: '1rem' },
+  
   fileInfo: {
-    backgroundColor: '#edf2f7',
-    padding: '0.75rem 1rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
     display: 'flex',
-    gap: '0.75rem',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: '0.75rem 1rem',
+    borderRadius: '12px',
+    marginBottom: '1.5rem',
     flexWrap: 'wrap',
+    gap: '0.75rem',
   },
-  tableWrapper: {
-    marginTop: '1.5rem',
-  },
+  fileName: { fontSize: '0.875rem', color: colors.text },
+  fileActions: { display: 'flex', gap: '0.5rem' },
+  
+  tableWrapper: { marginTop: '1.5rem' },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '1rem',
-    padding: '0 0.5rem',
+  },
+  sectionTitle: {
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    color: colors.text,
   },
   badge: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.background,
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
     fontSize: '0.875rem',
     fontWeight: '500',
-    color: '#4a5568',
+    color: colors.textLight,
   },
+  
   emptyState: {
     textAlign: 'center',
     padding: '3rem',
-    backgroundColor: '#f7fafc',
-    borderRadius: '12px',
-    color: '#a0aec0',
+    backgroundColor: colors.background,
+    borderRadius: '16px',
+    color: colors.textLight,
   },
-  emptyIcon: {
-    fontSize: '3rem',
-    display: 'block',
+  emptyIcon: { fontSize: '3rem', display: 'block', marginBottom: '1rem' },
+  
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '3rem',
+    color: colors.textLight,
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: `3px solid ${colors.border}`,
+    borderTopColor: colors.primary,
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
     marginBottom: '1rem',
   },
-  loading: {
-    textAlign: 'center',
-    padding: '3rem',
-    color: '#718096',
-    fontSize: '1.1rem',
-  },
+  
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    border: `1px solid ${colors.border}`,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBg,
   },
   tableHeaderRow: {
-    backgroundColor: '#f7fafc',
-    borderBottom: '2px solid #e2e8f0',
+    backgroundColor: colors.background,
+    borderBottom: `1px solid ${colors.border}`,
   },
   th: {
     padding: '1rem',
     textAlign: 'left',
     fontWeight: '600',
-    color: '#4a5568',
-    fontSize: '0.875rem',
+    color: colors.text,
+    fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     cursor: 'pointer',
-    userSelect: 'none',
   },
-  thCheckbox: {
-    padding: '1rem',
-    width: '40px',
-    textAlign: 'center',
-  },
-  thAksi: {
-    padding: '1rem',
-    width: '100px',
-    textAlign: 'center',
-  },
-  td: {
-    padding: '1rem',
-    color: '#2d3748',
-  },
-  tdCheckbox: {
-    padding: '1rem',
-    textAlign: 'center',
-  },
-  tdAksi: {
-    padding: '1rem',
-    textAlign: 'center',
-    whiteSpace: 'nowrap',
-  },
-  tableRow: {
-    borderBottom: '1px solid #e2e8f0',
-    transition: 'background-color 0.2s',
-  },
+  thCheckbox: { padding: '1rem', width: '40px', textAlign: 'center' },
+  thAksi: { padding: '1rem', width: '100px', textAlign: 'center' },
+  td: { padding: '1rem', color: colors.text, fontSize: '0.875rem' },
+  tdCheckbox: { padding: '1rem', textAlign: 'center' },
+  tdAksi: { padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' },
+  tableRow: { borderBottom: `1px solid ${colors.border}` },
   tableRowEven: {
-    backgroundColor: '#fafafa',
-    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#FCFCFD',
+    borderBottom: `1px solid ${colors.border}`,
   },
   checkbox: {
     cursor: 'pointer',
     width: '18px',
     height: '18px',
+    accentColor: colors.primary,
   },
+  
   badgeCode: {
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
+    fontFamily: 'monospace',
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     fontWeight: '500',
-    display: 'inline-block',
   },
   badgeCapacity: {
-    backgroundColor: '#fef5e7',
-    color: '#c05621',
+    backgroundColor: '#D1FAE5',
+    color: '#065F46',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
+    display: 'inline-block',
+  },
+  floorBadge: {
+    backgroundColor: '#E0E7FF',
+    color: '#3730A3',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
     display: 'inline-block',
   },
   badgeId: {
-    backgroundColor: '#e6fffa',
-    color: '#234e52',
+    backgroundColor: '#FCE7F3',
+    color: '#9D174D',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     display: 'inline-block',
   },
-  btnIconPrimary: {
+  
+  btnIconEdit: {
     background: 'none',
     border: 'none',
-    fontSize: '1.25rem',
+    fontSize: '1.125rem',
     cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
+    padding: '0.375rem',
+    borderRadius: '8px',
     marginRight: '0.5rem',
+    color: colors.textLight,
   },
-  btnIconDanger: {
+  btnIconDelete: {
     background: 'none',
     border: 'none',
-    fontSize: '1.25rem',
+    fontSize: '1.125rem',
     cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
+    padding: '0.375rem',
+    borderRadius: '8px',
+    color: colors.textLight,
   },
-  modal: {
+  
+  // Modal Styles
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '12px',
-    minWidth: '450px',
-    maxWidth: '90vw',
+    backgroundColor: colors.cardBg,
+    borderRadius: '24px',
+    width: '90%',
+    maxWidth: '500px',
     maxHeight: '90vh',
     overflowY: 'auto',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1.25rem 1.5rem',
+    borderBottom: `1px solid ${colors.border}`,
   },
   modalTitle: {
+    fontSize: '1.125rem',
+    fontWeight: '600',
+    color: colors.secondary,
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
     fontSize: '1.5rem',
-    marginBottom: '1.5rem',
-    color: '#333',
+    cursor: 'pointer',
+    color: colors.textLight,
   },
-  modalActions: {
+  modalBody: {
+    padding: '1.5rem',
+  },
+  modalFooter: {
     display: 'flex',
-    gap: '1rem',
     justifyContent: 'flex-end',
-    marginTop: '1.5rem',
+    gap: '1rem',
+    padding: '1rem 1.5rem 1.5rem',
+    borderTop: `1px solid ${colors.border}`,
   },
+  
   formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.375rem',
     marginBottom: '1rem',
   },
-  label: {
-    display: 'block',
-    marginBottom: '0.5rem',
-    fontWeight: '500',
-    color: '#4a5568',
-    fontSize: '0.875rem',
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '1rem',
   },
-  input: {
-    width: '100%',
-    padding: '0.75rem',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
-    fontSize: '0.9rem',
-    transition: 'border-color 0.2s',
+  label: globalStyles.label,
+  required: {
+    color: colors.danger,
   },
+  input: globalStyles.input,
   textarea: {
     width: '100%',
     padding: '0.75rem',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
-    fontSize: '0.9rem',
+    borderRadius: '12px',
+    border: `1px solid ${colors.border}`,
+    fontSize: '0.875rem',
     fontFamily: 'inherit',
     resize: 'vertical',
-    transition: 'border-color 0.2s',
+    transition: 'all 0.2s',
   },
 };
+
+// Add keyframes for spinner animation
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: ${colors.primary};
+      box-shadow: 0 0 0 3px rgba(244, 124, 56, 0.1);
+    }
+  `;
+  document.head.appendChild(styleSheet);
+}

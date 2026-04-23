@@ -159,7 +159,6 @@ export default function KelasPage() {
       const newClasses = kelasList.filter(k => !k.isExisting);
       const existingClasses = kelasList.filter(k => k.isExisting);
 
-      // POST kelas baru
       if (newClasses.length > 0) {
         const res = await fetch('/api/kelas', {
           method: 'POST',
@@ -170,11 +169,9 @@ export default function KelasPage() {
             kelasList: newClasses,
           }),
         });
-
         if (!res.ok) throw new Error('Gagal simpan kelas baru');
       }
 
-      // PUT update kelas yang sudah ada (jika dosen berubah)
       for (const kelas of existingClasses) {
         const res = await fetch('/api/kelas', {
           method: 'PUT',
@@ -184,7 +181,6 @@ export default function KelasPage() {
             dosen: kelas.dosen,
           }),
         });
-
         if (!res.ok) throw new Error(`Gagal update kelas ${kelas.nama}`);
       }
 
@@ -205,14 +201,12 @@ export default function KelasPage() {
 
     if (kelas.isExisting) {
       if (!confirm('Hapus kelas ini secara permanen?')) return;
-
       try {
         const res = await fetch('/api/kelas', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: kelas.id }),
         });
-
         if (!res.ok) throw new Error('Gagal hapus');
         showMessage('success', 'Kelas berhasil dihapus');
         await fetchKelasBaru();
@@ -343,8 +337,7 @@ export default function KelasPage() {
     setSortConfig((prev) => {
       if (prev.key !== key) return { key, direction: 'asc' };
       if (prev.direction === 'asc') return { key, direction: 'desc' };
-      if (prev.direction === 'desc') return { key: null, direction: null };
-      return { key, direction: 'asc' };
+      return { key: null, direction: null };
     });
   };
 
@@ -356,9 +349,7 @@ export default function KelasPage() {
       if (!aVal && !bVal) return 0;
       if (!aVal) return 1;
       if (!bVal) return -1;
-      return sortConfig.direction === 'asc'
-        ? aVal > bVal ? 1 : -1
-        : aVal < bVal ? 1 : -1;
+      return sortConfig.direction === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
   }
 
@@ -445,11 +436,20 @@ export default function KelasPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>📚 Dashboard Kelas</h1>
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>📚 Dashboard Kelas</h1>
+            <p style={styles.subtitle}>Kelola data kelas dan dosen pengajar</p>
+          </div>
+          <div style={styles.statsBadge}>
+            <span style={styles.statsNumber}>{kelasBaru.length}</span>
+            <span style={styles.statsLabel}>Total Kelas</span>
+          </div>
+        </div>
 
         {message.text && (
           <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+            {message.type === 'success' ? '✓' : '✗'} {message.text}
           </div>
         )}
 
@@ -458,8 +458,8 @@ export default function KelasPage() {
           <div style={styles.toolbarLeft}>
             <button
               style={{
-                ...styles.btnPrimary,
-                ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
+                ...styles.tabButton,
+                ...(activeTab === 'view' ? styles.tabActive : styles.tabInactive),
               }}
               onClick={() => setActiveTab('view')}
             >
@@ -467,8 +467,8 @@ export default function KelasPage() {
             </button>
             <button
               style={{
-                ...styles.btnPrimary,
-                ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
+                ...styles.tabButton,
+                ...(activeTab === 'add' ? styles.tabActive : styles.tabInactive),
               }}
               onClick={() => setActiveTab('add')}
             >
@@ -481,10 +481,7 @@ export default function KelasPage() {
         {activeTab === 'view' && (
           <div style={styles.tableWrapper}>
             <div style={styles.tableHeader}>
-              <h2>📋 Daftar Kelas yang Tersimpan</h2>
-              {kelasBaru.length > 0 && (
-                <span style={styles.badge}>Total: {kelasBaru.length} kelas</span>
-              )}
+              <h2 style={styles.sectionTitle}>📋 Daftar Kelas yang Tersimpan</h2>
             </div>
 
             {/* Search Filter */}
@@ -516,10 +513,7 @@ export default function KelasPage() {
               <div style={styles.emptyState}>
                 <span style={styles.emptyIcon}>📭</span>
                 <p>Belum ada kelas yang tersimpan</p>
-                <button 
-                  style={styles.btnPrimary}
-                  onClick={() => setActiveTab('add')}
-                >
+                <button style={styles.btnPrimary} onClick={() => setActiveTab('add')}>
                   ➕ Buat Kelas
                 </button>
               </div>
@@ -758,73 +752,37 @@ export default function KelasPage() {
         {/* ==================== TAB 2: KELOLA KELAS ==================== */}
         {activeTab === 'add' && (
           <div style={styles.tableWrapper}>
-            <h2>➕ Kelola Kelas</h2>
+            <h2 style={styles.sectionTitle}>➕ Kelola Kelas</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={styles.formGrid}>
               <div>
-                <label style={styles.label}>
-                  Program Studi/Kurikulum:
-                </label>
-                <select 
-                  onChange={(e) => handleProdi(e.target.value)}
-                  value={selectedProdi}
-                  style={styles.select}
-                  disabled={loading}
-                >
-                  <option value="">
-                    {loading ? '⏳ Loading...' : '📖 Pilih Kurikulum'}
-                  </option>
-                  {prodi.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.nama_kurikulum} ({p.tahun_ajaran})
-                    </option>
-                  ))}
+                <label style={styles.label}>Program Studi/Kurikulum:</label>
+                <select onChange={(e) => handleProdi(e.target.value)} value={selectedProdi} style={styles.select} disabled={loading}>
+                  <option value="">{loading ? '⏳ Loading...' : '📖 Pilih Kurikulum'}</option>
+                  {prodi.map(p => (<option key={p.id} value={p.id}>{p.nama_kurikulum} ({p.tahun_ajaran})</option>))}
                 </select>
               </div>
 
               <div>
-                <label style={styles.label}>
-                  Mata Kuliah:
-                </label>
+                <label style={styles.label}>Mata Kuliah:</label>
                 <input
                   type="text"
                   placeholder="Cari kode atau nama MK..."
                   value={searchMatkul}
-                  onChange={(e) => {
-                    setSearchMatkul(e.target.value);
-                    setShowDropdown(true);
-                    if (e.target.value === '') {
-                      setSelectedMatkul(null);
-                      setKelasList([]);
-                    }
-                  }}
+                  onChange={(e) => { setSearchMatkul(e.target.value); setShowDropdown(true); if (e.target.value === '') { setSelectedMatkul(null); setKelasList([]); } }}
                   onFocus={() => setShowDropdown(true)}
                   style={styles.select}
                 />
                 
-                {/* Dropdown hasil filter */}
                 {showDropdown && searchMatkul && filteredMatkul.length > 0 && (
                   <div style={styles.dropdown}>
                     {filteredMatkul.map(m => (
-                      <div
-                        key={m.id}
-                        onClick={() => handleMatkul(m.id)}
-                        style={{
-                          ...styles.dropdownItem,
-                          ...(selectedMatkul?.id === m.id ? styles.dropdownItemActive : {}),
-                        }}
-                      >
+                      <div key={m.id} onClick={() => handleMatkul(m.id)} style={{ ...styles.dropdownItem, ...(selectedMatkul?.id === m.id ? styles.dropdownItemActive : {}) }}>
                         <div style={styles.dropdownTitle}>{m.f_kodemk}</div>
                         <div style={styles.dropdownSubtitle}>{m.f_namamk}</div>
                         <div style={styles.dropdownDetail}>SKS: {m.f_sks_kurikulum} | Semester: {m.f_semester}</div>
                       </div>
                     ))}
-                  </div>
-                )}
-                
-                {showDropdown && searchMatkul && filteredMatkul.length === 0 && (
-                  <div style={styles.dropdownEmpty}>
-                    Tidak ada mata kuliah yang cocok
                   </div>
                 )}
               </div>
@@ -848,18 +806,13 @@ export default function KelasPage() {
             {selectedMatkul && (
               <>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <button 
-                    style={styles.btnPrimary}
-                    onClick={tambahKelas}
-                  >
-                    ➕ Tambah Kelas ({getNextClassName()})
-                  </button>
+                  <button style={styles.btnPrimary} onClick={tambahKelas}>➕ Tambah Kelas ({getNextClassName()})</button>
                 </div>
 
                 {kelasList.length === 0 ? (
                   <div style={styles.emptyState}>
                     <span style={styles.emptyIcon}>📭</span>
-                    <p>Belum ada kelas. Klik &quot;➕ Tambah Kelas&quot; untuk menambahkan.</p>
+                    <p>Belum ada kelas. Klik "➕ Tambah Kelas" untuk menambahkan.</p>
                   </div>
                 ) : (
                   <div style={styles.tableContainer}>
@@ -874,21 +827,11 @@ export default function KelasPage() {
                       <tbody>
                         {kelasList.map((k, idx) => (
                           <tr key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
+                            <td style={styles.td}><span style={styles.badgeKelas}>{k.nama}</span></td>
                             <td style={styles.td}>
-                              <span style={styles.badgeKelas}>{k.nama}</span>
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                list={`dosen-list-${idx}`}
-                                value={k.dosen}
-                                onChange={(e) => handleDosen(idx, e.target.value)}
-                                placeholder="Ketik atau pilih dosen..."
-                                style={styles.selectInput}
-                              />
+                              <input list={`dosen-list-${idx}`} value={k.dosen} onChange={(e) => handleDosen(idx, e.target.value)} placeholder="Ketik atau pilih dosen..." style={styles.input} />
                               <datalist id={`dosen-list-${idx}`}>
-                                {dosenList.map((d) => (
-                                  <option key={d.id} value={d.f_namapegawai} />
-                                ))}
+                                {dosenList.map((d) => (<option key={d.id} value={d.f_namapegawai} />))}
                               </datalist>
                              </td>
                             <td style={{ ...styles.td, textAlign: 'center' }}>
@@ -908,9 +851,7 @@ export default function KelasPage() {
                 )}
 
                 {kelasList.length > 0 && (
-                  <button onClick={handleSave} style={styles.btnSuccess}>
-                    💾 Simpan Semua Kelas
-                  </button>
+                  <button onClick={handleSave} style={styles.btnSuccess}>💾 Simpan Semua Kelas</button>
                 )}
               </>
             )}
@@ -1087,142 +1028,120 @@ export default function KelasPage() {
   );
 }
 
-// ================= STYLES =================
+// ================= UPNVJ THEME STYLES =================
 const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '2rem',
-  },
-  card: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-    padding: '2rem',
-  },
-  title: {
-    fontSize: '2rem',
-    color: '#333',
-    marginBottom: '2rem',
-    borderBottom: '3px solid #667eea',
-    paddingBottom: '0.5rem',
-    display: 'inline-block',
-  },
-  message: {
-    padding: '1rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    fontWeight: '500',
-  },
-  messageSuccess: {
-    backgroundColor: '#c6f6d5',
-    color: '#22543d',
-    border: '1px solid #9ae6b4',
-  },
-  messageError: {
-    backgroundColor: '#fed7d7',
-    color: '#742a2a',
-    border: '1px solid #fc8181',
-  },
-  toolbar: {
+  container: globalStyles.container,
+  card: globalStyles.card,
+  
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '2rem',
     flexWrap: 'wrap',
     gap: '1rem',
+  },
+  title: globalStyles.title,
+  subtitle: globalStyles.subtitle,
+  statsBadge: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.5rem',
+    backgroundColor: colors.background,
+    padding: '0.5rem 1rem',
+    borderRadius: '40px',
+  },
+  statsNumber: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  statsLabel: {
+    fontSize: '0.75rem',
+    color: colors.textLight,
+  },
+  
+  message: globalStyles.message,
+  messageSuccess: globalStyles.messageSuccess,
+  messageError: globalStyles.messageError,
+  
+  toolbar: {
     marginBottom: '1.5rem',
-    padding: '1rem',
-    backgroundColor: '#f7f9fc',
-    borderRadius: '12px',
+    paddingBottom: '1rem',
+    borderBottom: `1px solid ${colors.border}`,
   },
   toolbarLeft: {
     display: 'flex',
     gap: '0.75rem',
     flexWrap: 'wrap',
   },
-  activeTab: {
-    opacity: 1,
-    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-  },
-  inactiveTab: {
-    opacity: 0.6,
-  },
-  label: {
-    display: 'block',
-    marginBottom: '0.5rem',
-    fontWeight: '500',
-    color: '#4a5568',
-  },
-  select: {
-    padding: '0.75rem 1rem',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
-    fontSize: '0.9rem',
-    backgroundColor: 'white',
-    cursor: 'pointer',
-    width: '100%',
-    transition: 'border-color 0.2s',
-  },
-  selectInput: {
-    width: '100%',
-    padding: '0.75rem',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
-    fontSize: '0.9rem',
-    transition: 'border-color 0.2s',
-  },
-  dropdown: {
-    maxHeight: '250px',
-    overflowY: 'auto',
-    border: '1px solid #cbd5e0',
-    borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
-    backgroundColor: 'white',
-    position: 'relative',
-    zIndex: 10,
-    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-  },
-  dropdownItem: {
-    padding: '0.75rem 1rem',
-    borderBottom: '1px solid #e2e8f0',
-    cursor: 'pointer',
-    backgroundColor: 'white',
-    transition: 'background-color 0.2s',
-  },
-  dropdownItemActive: {
-    backgroundColor: '#f0f7ff',
-  },
-  dropdownTitle: {
-    fontWeight: '600',
-    color: '#4338ca',
-    fontSize: '0.9rem',
-  },
-  dropdownSubtitle: {
+  tabButton: {
+    padding: '0.625rem 1.25rem',
+    borderRadius: '40px',
     fontSize: '0.875rem',
-    color: '#4a5568',
-    marginTop: '0.25rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    border: 'none',
   },
-  dropdownDetail: {
-    fontSize: '0.75rem',
-    color: '#a0aec0',
-    marginTop: '0.25rem',
+  tabActive: {
+    backgroundColor: colors.primary,
+    color: 'white',
   },
-  dropdownEmpty: {
-    padding: '1rem',
-    border: '1px solid #cbd5e0',
-    borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
-    color: '#a0aec0',
-    textAlign: 'center',
-    fontSize: '0.9rem',
+  tabInactive: {
+    backgroundColor: colors.background,
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
   },
-  selectedInfo: {
-    backgroundColor: '#f0f7ff',
-    padding: '1rem',
+  
+  sectionTitle: {
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: '1rem',
+  },
+  
+  label: globalStyles.label,
+  select: globalStyles.input,
+  input: globalStyles.input,
+  inputDisabled: {
+    ...globalStyles.input,
+    backgroundColor: colors.background,
+    cursor: 'not-allowed',
+  },
+  inputSmall: {
+    padding: '0.5rem 0.75rem',
+    border: `1px solid ${colors.border}`,
     borderRadius: '12px',
-    marginBottom: '1.5rem',
-    borderLeft: '4px solid #667eea',
+    fontSize: '0.875rem',
+    width: '100%',
+  },
+  searchInput: {
+    width: '100%',
+    padding: '0.75rem 1rem',
+    border: `1px solid ${colors.border}`,
+    borderRadius: '12px',
+    fontSize: '0.95rem',
+    transition: 'all 0.2s',
+  },
+  searchInfo: {
+    fontSize: '0.85rem',
+    color: colors.textLight,
+    marginTop: '0.5rem',
+  },
+  
+  btnPrimary: globalStyles.btnPrimary,
+  btnSuccess: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: colors.success,
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    width: '100%',
+    marginTop: '1.5rem',
   },
   infoBadge: {
     backgroundColor: '#667eea',
@@ -1239,24 +1158,34 @@ const styles = {
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '0.9rem',
+    fontSize: '0.8rem',
     fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
+    marginTop: '0.75rem',
   },
-  btnSuccess: {
-    padding: '0.75rem 1.5rem',
-    background: '#48bb78',
+  btnSuccessSmall: {
+    padding: '0.4rem 0.8rem',
+    backgroundColor: colors.success,
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '1rem',
-    fontWeight: '600',
+    fontSize: '0.8rem',
+    fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
-    marginTop: '1.5rem',
-    width: '100%',
+    flex: 1,
   },
+  btnSecondarySmall: {
+    padding: '0.4rem 0.8rem',
+    backgroundColor: colors.background,
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    fontSize: '0.8rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    flex: 1,
+  },
+  btnSecondary: globalStyles.btnSecondary,
   btnIconDanger: {
     background: 'none',
     border: 'none',
@@ -1285,79 +1214,129 @@ const styles = {
   tableWrapper: {
     marginTop: '1.5rem',
   },
+  btnExpand: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    padding: '0.25rem 0.5rem',
+    color: colors.primary,
+    fontWeight: '600',
+    width: '30px',
+    height: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '6px',
+  },
+  btnEditSmall: {
+    padding: '0.3rem 0.6rem',
+    backgroundColor: colors.success,
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '0.7rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    marginRight: '0.25rem',
+  },
+  btnDeleteSmall: {
+    padding: '0.3rem 0.5rem',
+    backgroundColor: colors.danger,
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '0.7rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+  
+  tableWrapper: { marginTop: '1.5rem' },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '1rem',
-    padding: '0 0.5rem',
-  },
-  badge: {
-    backgroundColor: '#e2e8f0',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    color: '#4a5568',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '3rem',
-    backgroundColor: '#f7fafc',
-    borderRadius: '12px',
-    color: '#a0aec0',
-  },
-  emptyIcon: {
-    fontSize: '3rem',
-    display: 'block',
-    marginBottom: '1rem',
   },
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
-    marginBottom: '1.5rem',
+    borderRadius: '16px',
+    border: `1px solid ${colors.border}`,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBg,
   },
   tableHeaderRow: {
-    backgroundColor: '#f7fafc',
-    borderBottom: '2px solid #e2e8f0',
+    backgroundColor: colors.background,
+    borderBottom: `1px solid ${colors.border}`,
   },
   th: {
     padding: '1rem',
     textAlign: 'left',
     fontWeight: '600',
-    color: '#4a5568',
-    fontSize: '0.875rem',
+    color: colors.text,
+    fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     cursor: 'pointer',
-    userSelect: 'none',
   },
   td: {
     padding: '1rem',
-    color: '#2d3748',
+    color: colors.text,
+    fontSize: '0.875rem',
   },
   tableRow: {
-    borderBottom: '1px solid #e2e8f0',
-    transition: 'background-color 0.2s',
+    borderBottom: `1px solid ${colors.border}`,
   },
   tableRowEven: {
-    backgroundColor: '#fafafa',
-    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#FCFCFD',
+    borderBottom: `1px solid ${colors.border}`,
   },
+  
+  emptyState: {
+    textAlign: 'center',
+    padding: '3rem',
+    backgroundColor: colors.background,
+    borderRadius: '16px',
+    color: colors.textLight,
+  },
+  emptyIcon: { fontSize: '3rem', display: 'block', marginBottom: '1rem' },
+  
   badgeCode: {
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
+    fontFamily: 'monospace',
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     fontWeight: '500',
-    display: 'inline-block',
+  },
+  sksBadge: {
+    backgroundColor: '#D1FAE5',
+    color: '#065F46',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+  },
+  semesterBadge: {
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+  },
+  classBadge: {
+    marginLeft: '0.75rem',
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryDark,
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.7rem',
+    fontWeight: '600',
   },
   sksBadge: {
     backgroundColor: '#c6f6d5',
@@ -1373,8 +1352,16 @@ const styles = {
     color: '#c05621',
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     fontWeight: '600',
+  },
+  infoBadge: {
+    backgroundColor: colors.primary,
+    color: 'white',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '500',
     display: 'inline-block',
   },
   classBadge: {
