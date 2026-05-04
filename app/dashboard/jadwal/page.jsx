@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { colors, globalStyles } from '@/app/styles/upnvjTheme';
 
 export default function JadwalPage() {
   // ===== STATE MANAGEMENT =====
@@ -560,25 +561,44 @@ export default function JadwalPage() {
 
   if (loading) return <div className="p-8">Loading...</div>;
 
+  const styles = {
+    container: globalStyles.container,
+    card: globalStyles.card,
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '2rem',
+      flexWrap: 'wrap',
+      gap: '1rem',
+    },
+    title: globalStyles.title,
+    subtitle: globalStyles.subtitle,
+    message: globalStyles.message,
+    messageSuccess: globalStyles.messageSuccess,
+    messageError: globalStyles.messageError,
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div style={styles.container}>
+      <div style={styles.card}>
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Jadwal Kuliah</h1>
-          <p className="text-gray-600">Kelola jadwal kuliah dengan mudah</p>
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>📅 Jadwal Kuliah</h1>
+            <p style={styles.subtitle}>Kelola jadwal kuliah dengan mudah</p>
+          </div>
         </div>
 
         {/* Messages */}
         {message.text && (
           <div
-            className={`mb-4 p-4 rounded-lg ${
-              message.type === 'success'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
-            }`}
+            style={{
+              ...styles.message,
+              ...(message.type === 'success' ? styles.messageSuccess : styles.messageError),
+            }}
           >
-            {message.text}
+            {message.type === 'success' ? '✓' : '✗'} {message.text}
           </div>
         )}
 
@@ -1058,57 +1078,93 @@ export default function JadwalPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Jam Mulai</label>
-                <input
-                  type="time"
-                  value={selectedJamMulai}
-                  onChange={(e) => {
-                    setSelectedJamMulai(e.target.value);
-                    if (selectedKelas) {
-                      const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
-                      setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
-                    } else {
-                      setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+              <div className="flex gap-4">
+                {/* Jam Mulai */}
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-2">Jam Mulai</label>
+                  {selectedRuangan && selectedHari ? (
+                    <select
+                      value={selectedJamMulai}
+                      onChange={(e) => {
+                        setSelectedJamMulai(e.target.value);
+                        if (selectedKelas) {
+                          const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
+                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
+                        } else {
+                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Pilih Jam</option>
+                      {generateTimeSlots(selectedHari).map((slot, idx) => {
+                        const isOccupied = isSlotOccupied(selectedHari, parseInt(selectedRuangan), slot.start, slot.end);
+                        const isBreak = slot.isBreak;
+                        if (isOccupied || isBreak) return null;
+                        return (
+                          <option key={idx} value={slot.start}>
+                            {slot.start} - {slot.end}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <input
+                      type="time"
+                      value={selectedJamMulai}
+                      onChange={(e) => {
+                        setSelectedJamMulai(e.target.value);
+                        if (selectedKelas) {
+                          const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
+                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
+                        } else {
+                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Pilih ruangan & hari terlebih dahulu"
+                    />
+                  )}
+                </div>
+
+                {/* Jam Selesai */}
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-2">
+                    Jam Selesai (Otomatis)
+                  </label>
+                  <input
+                    type="time"
+                    value={calculatedJamSelesai}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
+                  />
+
+                  {selectedKelas && (
+                    <small className="text-gray-600 text-xs mt-1 block">
+                      📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit
+                    </small>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Jam Selesai (Otomatis)</label>
-                <input
-                  type="time"
-                  value={calculatedJamSelesai}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
-                />
-                {selectedKelas && (
-                  <small className="text-gray-600 text-xs mt-1 block">
-                    📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit
-                  </small>
-                )}
-                
-                {/* Warning jika kelas 2+ SKS terpotong jam istirahat */}
-                {selectedKelas && (() => {
-                  const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
-                  if (sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks)) {
-                    const breakTimes = getBreakTimes(selectedHari);
-                    return (
-                      <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm font-medium text-red-800 mb-1">❌ Jadwal Tidak Valid</p>
-                        <p className="text-xs text-red-700">
-                          Kelas dengan <strong>{sks} SKS</strong> tidak boleh terpotong jam istirahat 
-                          <br />
-                          <strong>{breakTimes.mulai}-{breakTimes.selesai}</strong>
-                        </p>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
+              {/* WARNING jika kelas 2+ SKS terpotong jam istirahat */}
+              {selectedKelas && (() => {
+                const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
+                if (sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks)) {
+                  const breakTimes = getBreakTimes(selectedHari);
+                  return (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm font-medium text-red-800 mb-1">❌ Jadwal Tidak Valid</p>
+                      <p className="text-xs text-red-700">
+                        Kelas dengan <strong>{sks} SKS</strong> tidak boleh terpotong jam istirahat 
+                        <br />
+                        <strong>{breakTimes.mulai}-{breakTimes.selesai}</strong>
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <div>
                 <label className="block text-sm font-medium mb-2">

@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }) {
   const navItems = [
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
     { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
-    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
+    { id: 'ruangan', label: '🏢 Ruangan', href: '/dashboard/ruangan' },
     { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
     { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
   ];

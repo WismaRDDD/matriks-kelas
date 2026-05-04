@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, Fragment } from 'react';
+import { colors, globalStyles } from '@/app/styles/upnvjTheme';
 
 export default function KelasPage() {
   const [prodi, setProdi] = useState([]);
@@ -812,7 +813,7 @@ export default function KelasPage() {
                 {kelasList.length === 0 ? (
                   <div style={styles.emptyState}>
                     <span style={styles.emptyIcon}>📭</span>
-                    <p>Belum ada kelas. Klik "➕ Tambah Kelas" untuk menambahkan.</p>
+                    <p>Belum ada kelas. Klik &quot;➕ Tambah Kelas&quot; untuk menambahkan.</p>
                   </div>
                 ) : (
                   <div style={styles.tableContainer}>

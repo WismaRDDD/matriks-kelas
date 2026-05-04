@@ -583,9 +583,20 @@ export default function RuanganPage() {
 
 // ================= UPNVJ THEME STYLES =================
 const styles = {
+  // Global Styles References
   container: globalStyles.container,
   card: globalStyles.card,
+  title: globalStyles.title,
+  subtitle: globalStyles.subtitle,
+  label: globalStyles.label,
+  input: globalStyles.input,
+  btnPrimary: globalStyles.btnPrimary,
+  btnSecondary: globalStyles.btnSecondary,
+  message: globalStyles.message,
+  messageSuccess: globalStyles.messageSuccess,
+  messageError: globalStyles.messageError,
   
+  // Header & Stats
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -594,12 +605,13 @@ const styles = {
     flexWrap: 'wrap',
     gap: '1rem',
   },
-  message: {
-    padding: '1rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    fontWeight: '500',
-    whiteSpace: 'pre-line',
+  statsBadge: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.5rem',
+    backgroundColor: colors.background,
+    padding: '0.5rem 1rem',
+    borderRadius: '40px',
   },
   statsNumber: {
     fontSize: '1.5rem',
@@ -611,10 +623,7 @@ const styles = {
     color: colors.textLight,
   },
   
-  message: globalStyles.message,
-  messageSuccess: globalStyles.messageSuccess,
-  messageError: globalStyles.messageError,
-  
+  // Toolbar
   toolbar: {
     marginBottom: '1.5rem',
     paddingBottom: '1rem',
@@ -625,8 +634,20 @@ const styles = {
     gap: '0.75rem',
     flexWrap: 'wrap',
   },
-  
-  btnPrimary: globalStyles.btnPrimary,
+  btnInfo: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.625rem 1.25rem',
+    backgroundColor: '#4299e1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '40px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
   btnOutline: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -637,44 +658,27 @@ const styles = {
     border: `1px solid ${colors.border}`,
     borderRadius: '40px',
     fontSize: '0.875rem',
-    fontWeight: '500',
+    fontWeight: '600',
     cursor: 'pointer',
+    transition: 'all 0.2s',
   },
-  btnDanger: globalStyles.btnDanger,
-  btnSecondary: globalStyles.btnSecondary,
-  btnSmallPrimary: {
-    padding: '0.375rem 0.875rem',
-    backgroundColor: colors.primary,
+  btnDanger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.625rem 1.25rem',
+    backgroundColor: colors.danger,
     color: 'white',
     border: 'none',
-    borderRadius: '20px',
-    fontSize: '0.75rem',
-    fontWeight: '500',
+    borderRadius: '40px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
     cursor: 'pointer',
-  },
-  btnInfo: {
-    padding: '0.5rem 1rem',
-    background: '#4299e1',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  btnSecondary: {
-    padding: '0.5rem 1rem',
-    background: '#a0aec0',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    cursor: 'pointer',
+    transition: 'all 0.2s',
   },
   btnIcon: { fontSize: '1rem' },
   
+  // File Upload
   fileInfo: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -686,10 +690,40 @@ const styles = {
     flexWrap: 'wrap',
     gap: '0.75rem',
   },
-  fileName: { fontSize: '0.875rem', color: colors.text },
-  fileActions: { display: 'flex', gap: '0.5rem' },
+  fileName: { 
+    fontSize: '0.875rem', 
+    color: colors.text 
+  },
+  fileActions: { 
+    display: 'flex', 
+    gap: '0.5rem' 
+  },
+  btnSmallPrimary: {
+    padding: '0.375rem 0.875rem',
+    backgroundColor: colors.primary,
+    color: 'white',
+    border: 'none',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  btnSmallSecondary: {
+    padding: '0.375rem 0.875rem',
+    backgroundColor: colors.background,
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
   
-  tableWrapper: { marginTop: '1.5rem' },
+  // Table Section
+  tableWrapper: { 
+    marginTop: '1.5rem' 
+  },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -710,6 +744,7 @@ const styles = {
     color: colors.textLight,
   },
   
+  // Empty & Loading States
   emptyState: {
     textAlign: 'center',
     padding: '3rem',
@@ -717,8 +752,11 @@ const styles = {
     borderRadius: '16px',
     color: colors.textLight,
   },
-  emptyIcon: { fontSize: '3rem', display: 'block', marginBottom: '1rem' },
-  
+  emptyIcon: { 
+    fontSize: '3rem', 
+    display: 'block', 
+    marginBottom: '1rem' 
+  },
   loading: {
     display: 'flex',
     flexDirection: 'column',
@@ -737,6 +775,7 @@ const styles = {
     marginBottom: '1rem',
   },
   
+  // Table Styles
   tableContainer: {
     overflowX: 'auto',
     borderRadius: '16px',
@@ -761,12 +800,33 @@ const styles = {
     letterSpacing: '0.05em',
     cursor: 'pointer',
   },
-  thCheckbox: { padding: '1rem', width: '40px', textAlign: 'center' },
-  thAksi: { padding: '1rem', width: '100px', textAlign: 'center' },
-  td: { padding: '1rem', color: colors.text, fontSize: '0.875rem' },
-  tdCheckbox: { padding: '1rem', textAlign: 'center' },
-  tdAksi: { padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' },
-  tableRow: { borderBottom: `1px solid ${colors.border}` },
+  thCheckbox: { 
+    padding: '1rem', 
+    width: '40px', 
+    textAlign: 'center' 
+  },
+  thAksi: { 
+    padding: '1rem', 
+    width: '100px', 
+    textAlign: 'center' 
+  },
+  td: { 
+    padding: '1rem', 
+    color: colors.text, 
+    fontSize: '0.875rem' 
+  },
+  tdCheckbox: { 
+    padding: '1rem', 
+    textAlign: 'center' 
+  },
+  tdAksi: { 
+    padding: '1rem', 
+    textAlign: 'center', 
+    whiteSpace: 'nowrap' 
+  },
+  tableRow: { 
+    borderBottom: `1px solid ${colors.border}` 
+  },
   tableRowEven: {
     backgroundColor: '#FCFCFD',
     borderBottom: `1px solid ${colors.border}`,
@@ -778,6 +838,16 @@ const styles = {
     accentColor: colors.primary,
   },
   
+  // Badges
+  badgeId: {
+    backgroundColor: '#FCE7F3',
+    color: '#9D174D',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    display: 'inline-block',
+  },
   badgeCode: {
     fontFamily: 'monospace',
     backgroundColor: '#FEF3C7',
@@ -786,6 +856,7 @@ const styles = {
     borderRadius: '20px',
     fontSize: '0.75rem',
     fontWeight: '500',
+    display: 'inline-block',
   },
   badgeCapacity: {
     backgroundColor: '#D1FAE5',
@@ -793,25 +864,11 @@ const styles = {
     padding: '0.25rem 0.75rem',
     borderRadius: '20px',
     fontSize: '0.75rem',
-    display: 'inline-block',
-  },
-  floorBadge: {
-    backgroundColor: '#E0E7FF',
-    color: '#3730A3',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.75rem',
-    display: 'inline-block',
-  },
-  badgeId: {
-    backgroundColor: '#FCE7F3',
-    color: '#9D174D',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.75rem',
+    fontWeight: '500',
     display: 'inline-block',
   },
   
+  // Icons
   btnIconEdit: {
     background: 'none',
     border: 'none',
@@ -821,6 +878,7 @@ const styles = {
     borderRadius: '8px',
     marginRight: '0.5rem',
     color: colors.textLight,
+    transition: 'all 0.2s',
   },
   btnIconDelete: {
     background: 'none',
@@ -830,6 +888,7 @@ const styles = {
     padding: '0.375rem',
     borderRadius: '8px',
     color: colors.textLight,
+    transition: 'all 0.2s',
   },
   
   // Modal Styles
@@ -885,6 +944,7 @@ const styles = {
     borderTop: `1px solid ${colors.border}`,
   },
   
+  // Form Styles
   formGroup: {
     display: 'flex',
     flexDirection: 'column',
@@ -896,11 +956,9 @@ const styles = {
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem',
   },
-  label: globalStyles.label,
   required: {
     color: colors.danger,
   },
-  input: globalStyles.input,
   textarea: {
     width: '100%',
     padding: '0.75rem',
@@ -913,7 +971,7 @@ const styles = {
   },
 };
 
-// Add keyframes for spinner animation
+// Add keyframes for spinner animation and hover effects
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style');
   styleSheet.textContent = `

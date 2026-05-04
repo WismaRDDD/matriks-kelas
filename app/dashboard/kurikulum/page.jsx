@@ -282,7 +282,7 @@ export default function KurikulumPage() {
       <div style={styles.card}>
         <div style={styles.header}>
           <div>
-            <h1 style={styles.title}>📚 Dashboard Kurikulum</h1>
+            <h1 style={styles.title}>📖 Dashboard Kurikulum</h1>
             <p style={styles.subtitle}>Kelola data kurikulum dan mata kuliah</p>
           </div>
           <div style={styles.statsBadge}>
