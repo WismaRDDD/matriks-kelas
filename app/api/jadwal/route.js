@@ -2,9 +2,12 @@ import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
 // GET semua jadwal dengan join ke tabel kelas, kurikulum, dosen, dan ruangan
-export async function GET() {
+export async function GET(req) {
   try {
-    const data = await knex('jadwal')
+    const { searchParams } = new URL(req.url);
+    const kurikulumId = searchParams.get('kurikulum_id');
+
+    let query = knex('jadwal')
       .leftJoin('kelas', 'jadwal.kelas_id', 'kelas.id')
       .leftJoin('kurikulum', 'jadwal.kurikulum_id', 'kurikulum.id')
       .leftJoin('dosen', 'jadwal.dosen_id', 'dosen.id')
@@ -28,7 +31,14 @@ export async function GET() {
         'jadwal.lantai',
         'jadwal.created_at',
         'jadwal.updated_at'
-      )
+      );
+
+    // Filter berdasarkan kurikulum_id jika diberikan
+    if (kurikulumId) {
+      query = query.where('jadwal.kurikulum_id', parseInt(kurikulumId));
+    }
+
+    const data = await query
       .orderBy('jadwal.hari', 'asc')
       .orderBy('jadwal.jam_mulai', 'asc');
     

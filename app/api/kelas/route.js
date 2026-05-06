@@ -2,40 +2,55 @@ import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
 // GET semua kelas dengan join data lengkap dari table lain + preferences
-export async function GET() {
-  const data = await knex('kelas')
-    .leftJoin('kurikulum', 'kelas.f_matkul_id', 'kurikulum.id')
-    .leftJoin('kurikulum_master', 'kelas.f_kurikulum', 'kurikulum_master.id')
-    .leftJoin('dosen', 'kelas.dosen', 'dosen.f_namapegawai')
-    .select(
-      'kelas.id',
-      'kelas.f_kurikulum',
-      'kelas.f_matkul_id',
-      'kelas.nama_kelas',
-      'kelas.dosen',
-      'kelas.display_name',
-      'kelas.f_sks_kurikulum',
-      'kelas.f_semester',
-      'kelas.prefer_lantai',
-      'kelas.prefer_hari',
-      'kelas.avoid_hari',
-      'kelas.prefer_jam_mulai',
-      'kelas.prefer_jam_selesai',
-      'kelas.created_at',
-      'kelas.updated_at',
-      'kurikulum.f_namamk',
-      'kurikulum.f_kodemk',
-      'kurikulum.f_semester as matkul_semester',
-      'kurikulum.f_sks_kurikulum as matkul_sks',
-      'kurikulum_master.kode_kurikulum',
-      'kurikulum_master.nama_kurikulum',
-      'dosen.f_namapegawai',
-      'dosen.f_title_depan',
-      'dosen.f_title_belakang'
-    )
-    .orderBy('kelas.id', 'desc');
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const kurikulumId = searchParams.get('kurikulum_id');
 
-  return NextResponse.json(data);
+    let query = knex('kelas')
+      .leftJoin('kurikulum', 'kelas.f_matkul_id', 'kurikulum.id')
+      .leftJoin('kurikulum_master', 'kelas.f_kurikulum', 'kurikulum_master.id')
+      .leftJoin('dosen', 'kelas.dosen', 'dosen.f_namapegawai')
+      .select(
+        'kelas.id',
+        'kelas.f_kurikulum',
+        'kelas.f_matkul_id',
+        'kelas.nama_kelas',
+        'kelas.dosen',
+        'kelas.display_name',
+        'kelas.f_sks_kurikulum',
+        'kelas.f_semester',
+        'kelas.prefer_lantai',
+        'kelas.prefer_hari',
+        'kelas.avoid_hari',
+        'kelas.prefer_jam_mulai',
+        'kelas.prefer_jam_selesai',
+        'kelas.created_at',
+        'kelas.updated_at',
+        'kurikulum.f_namamk',
+        'kurikulum.f_kodemk',
+        'kurikulum.f_semester as matkul_semester',
+        'kurikulum.f_sks_kurikulum as matkul_sks',
+        'kurikulum_master.kode_kurikulum',
+        'kurikulum_master.nama_kurikulum',
+        'kurikulum_master.tahun_ajaran',
+        'kurikulum_master.f_tahun_akademik',
+        'dosen.f_namapegawai',
+        'dosen.f_title_depan',
+        'dosen.f_title_belakang'
+      );
+
+    // Filter berdasarkan kurikulum_id jika diberikan
+    if (kurikulumId) {
+      query = query.where('kelas.f_kurikulum', parseInt(kurikulumId));
+    }
+
+    const data = await query.orderBy('kelas.id', 'desc');
+
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
 // POST simpan kelas baru dengan data dari table lain + preferences

@@ -9,6 +9,7 @@ export default function DashboardLayout({ children }) {
 
   // Compute activeTab langsung dari pathname tanpa setState
   const getActiveTab = () => {
+    if (pathname.includes('/tahun-akademik')) return 'tahun-akademik';
     if (pathname.includes('/dosen')) return 'dosen';
     if (pathname.includes('/ruangan')) return 'ruangan';
     if (pathname.includes('/kelas')) return 'kelas';
@@ -20,10 +21,11 @@ export default function DashboardLayout({ children }) {
   const activeTab = getActiveTab();
 
   const navItems = [
+    { id: 'tahun-akademik', label: '📅 Tahun Akademik', href: '/dashboard/tahun-akademik' },
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
     { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
     { id: 'ruangan', label: '🏢 Ruangan', href: '/dashboard/ruangan' },
-    { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
+    { id: 'kelas', label: '📚 KRS Matakuliah', href: '/dashboard/kelas' },
     { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
   ];
 
@@ -100,7 +102,7 @@ const styles = {
     padding: '1rem 0.5rem',
     fontSize: '1rem',
     fontWeight: '500',
-    color: '#4a5568',
+    color: '#000000',
     cursor: 'pointer',
     transition: 'color 0.2s',
     position: 'relative',

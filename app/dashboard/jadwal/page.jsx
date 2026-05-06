@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { colors, globalStyles } from '@/app/styles/upnvjTheme';
 
 export default function JadwalPage() {
   // ===== STATE MANAGEMENT =====
@@ -20,15 +19,19 @@ export default function JadwalPage() {
       durasiSlot: 50,
       jamIstirahatMulaiSeninKamis: '12:10',
       jamIstirahatSelesaiSeninKamis: '13:00',
+      jamIstirahatMulaiSabtu: '12:10',
+      jamIstirahatSelesaiSabtu: '13:00',
       jamIstirahatMulaiJumat: '11:20',
       jamIstirahatSelesaiJumat: '13:30',
-      jamSelesai: '17:10',
+      jamSelesai: '18:00',
     },
     Ramadhan: {
       jamMulai: '08:00',
       durasiSlot: 40,
       jamIstirahatMulaiSeninKamis: '12:10',
       jamIstirahatSelesaiSeninKamis: '13:00',
+      jamIstirahatMulaiSabtu: '12:10',
+      jamIstirahatSelesaiSabtu: '13:00',
       jamIstirahatMulaiJumat: '11:20',
       jamIstirahatSelesaiJumat: '13:30',
       jamSelesai: '17:10',
@@ -42,7 +45,8 @@ export default function JadwalPage() {
     Selasa: true,
     Rabu: true,
     Kamis: true,
-    Jumat: true
+    Jumat: true,
+    Sabtu: true
   });
 
   // Session input
@@ -65,8 +69,25 @@ export default function JadwalPage() {
     usePreferences: true
   });
 
+  // Preset management
+  const [showPresetsSection, setShowPresetsSection] = useState(true);
+  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [databasePresets, setDatabasePresets] = useState([]);
+  const [presetSaving, setPresetSaving] = useState(false);
+
+  // Filter states
+  const [tahunAkademikList, setTahunAkademikList] = useState([]);
+  const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
+  const [kurikulumList, setKurikulumList] = useState([]);
+  const [selectedKodeKurikulum, setSelectedKodeKurikulum] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('');
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState('');
+  const [selectedKurikulumId, setSelectedKurikulumId] = useState('');
+
   const tableRef = useRef(null);
-  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const semesters = ['Gasal', 'Genap'];
 
   // ===== FETCH DATA =====
   const fetchData = async () => {
@@ -113,7 +134,262 @@ export default function JadwalPage() {
 
   useEffect(() => {
     fetchData();
+    fetchTahunAkademik();
+    fetchPresets();
   }, []);
+
+  // Fetch presets dari database
+  const fetchPresets = async () => {
+    try {
+      const res = await fetch('/api/preset');
+      const data = await res.json();
+      setDatabasePresets(data);
+    } catch (error) {
+      console.warn('Gagal fetch presets dari database:', error.message);
+    }
+  };
+
+  // Simpan preset baru ke database
+  const handleSavePreset = async () => {
+    if (!newPresetName.trim()) {
+      showMessage('error', 'Nama preset tidak boleh kosong');
+      return;
+    }
+
+    if (databasePresets.some(p => p.nama_preset.toLowerCase() === newPresetName.toLowerCase())) {
+      showMessage('error', 'Preset dengan nama ini sudah ada');
+      return;
+    }
+
+    try {
+      setPresetSaving(true);
+      const res = await fetch('/api/preset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nama_preset: newPresetName,
+          jam_mulai: settings.jamMulai,
+          durasiSlot: settings.durasiSlot,
+          jamIstirahatMulaiSeninKamis: settings.jamIstirahatMulaiSeninKamis,
+          jamIstirahatSelesaiSeninKamis: settings.jamIstirahatSelesaiSeninKamis,
+          jamIstirahatMulaiSabtu: settings.jamIstirahatMulaiSabtu,
+          jamIstirahatSelesaiSabtu: settings.jamIstirahatSelesaiSabtu,
+          jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat,
+          jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat,
+          jamSelesai: settings.jamSelesai,
+          is_default: false,
+        })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage('error', result.error || 'Gagal menyimpan preset');
+        return;
+      }
+
+      showMessage('success', `Preset "${newPresetName}" berhasil disimpan`);
+      setNewPresetName('');
+      setShowSavePresetModal(false);
+      await fetchPresets();
+    } catch (err) {
+      showMessage('error', `Error: ${err.message}`);
+    } finally {
+      setPresetSaving(false);
+    }
+  };
+
+  // Delete preset dari database
+  const handleDeletePreset = async (presetId, presetName) => {
+    if (!confirm(`Hapus preset "${presetName}"?`)) return;
+
+    try {
+      const res = await fetch('/api/preset', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: presetId })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage('error', result.error || 'Gagal menghapus preset');
+        return;
+      }
+
+      showMessage('success', `Preset "${presetName}" berhasil dihapus`);
+      await fetchPresets();
+    } catch (err) {
+      showMessage('error', `Error: ${err.message}`);
+    }
+  };
+
+  // Update perubahan preset ke database
+  const handleUpdatePreset = async () => {
+    const currentPreset = databasePresets.find(p => p.nama_preset === activePreset);
+    
+    if (!currentPreset) {
+      showMessage('error', 'Preset harus dipilih dari database untuk diupdate');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/preset', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentPreset.id,
+          jam_mulai: settings.jamMulai,
+          durasiSlot: settings.durasiSlot,
+          jamIstirahatMulaiSeninKamis: settings.jamIstirahatMulaiSeninKamis,
+          jamIstirahatSelesaiSeninKamis: settings.jamIstirahatSelesaiSeninKamis,
+          jamIstirahatMulaiSabtu: settings.jamIstirahatMulaiSabtu,
+          jamIstirahatSelesaiSabtu: settings.jamIstirahatSelesaiSabtu,
+          jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat,
+          jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat,
+          jamSelesai: settings.jamSelesai,
+        })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage('error', result.error || 'Gagal mengupdate preset');
+        return;
+      }
+
+      showMessage('success', `Preset "${activePreset}" berhasil diupdate`);
+      await fetchPresets();
+    } catch (err) {
+      showMessage('error', `Error: ${err.message}`);
+    }
+  };
+
+  // Check jika ada perubahan pada preset yang sedang aktif
+  const hasPresetChanges = () => {
+    const currentPreset = databasePresets.find(p => p.nama_preset === activePreset);
+    
+    if (!currentPreset) return false;
+
+    return (
+      settings.jamMulai !== currentPreset.jam_mulai ||
+      settings.durasiSlot !== currentPreset.durasi_slot ||
+      settings.jamIstirahatMulaiSeninKamis !== currentPreset.jam_istirahat_mulai_senin_kamis ||
+      settings.jamIstirahatSelesaiSeninKamis !== currentPreset.jam_istirahat_selesai_senin_kamis ||
+      settings.jamIstirahatMulaiSabtu !== currentPreset.jam_istirahat_mulai_sabtu ||
+      settings.jamIstirahatSelesaiSabtu !== currentPreset.jam_istirahat_selesai_sabtu ||
+      settings.jamIstirahatMulaiJumat !== currentPreset.jam_istirahat_mulai_jumat ||
+      settings.jamIstirahatSelesaiJumat !== currentPreset.jam_istirahat_selesai_jumat ||
+      settings.jamSelesai !== currentPreset.jam_selesai
+    );
+  };
+
+  // Fetch tahun akademik
+  const fetchTahunAkademik = async () => {
+    try {
+      const res = await fetch('/api/tahun-akademik');
+      const data = await res.json();
+      setTahunAkademikList(data);
+    } catch (error) {
+      showMessage('error', 'Gagal fetch tahun akademik');
+    }
+  };
+
+  // Fetch kurikulum berdasarkan tahun akademik
+  const fetchKurikulum = async (tahunId) => {
+    if (!tahunId) {
+      setKurikulumList([]);
+      return;
+    }
+    try {
+      const res = await fetch('/api/kurikulum-master');
+      const data = await res.json();
+      const filtered = data.filter((k) => String(k.f_tahun_akademik) === String(tahunId));
+      setKurikulumList(filtered);
+    } catch (error) {
+      showMessage('error', 'Gagal fetch kurikulum data');
+    }
+  };
+
+  // Fetch kelas dan jadwal berdasarkan kurikulum
+  const fetchKelasAndJadwalByKurikulum = async (kurikulumId) => {
+    if (!kurikulumId) {
+      // Jika tidak ada kurikulum, fetch semua data seperti biasa
+      await fetchData();
+      return;
+    }
+    try {
+      setLoading(true);
+      // Fetch kelas dan jadwal spesifik untuk kurikulum
+      const [kelasRes, jadwalRes] = await Promise.all([
+        fetch(`/api/kelas?kurikulum_id=${kurikulumId}`),
+        fetch(`/api/jadwal?kurikulum_id=${kurikulumId}`)
+      ]);
+
+      if (!kelasRes.ok || !jadwalRes.ok) {
+        // Jika endpoint dengan parameter tidak support, fallback ke fetch semua data
+        console.warn('API dengan kurikulum_id parameter tidak tersupport, menggunakan data semua kurikulum');
+        await fetchData();
+        return;
+      }
+
+      const kelas = await kelasRes.json();
+      const jadwal = await jadwalRes.json();
+
+      setKelasList(kelas);
+
+      // Organize jadwal by day and ruangan
+      const organizedJadwal = {};
+      days.forEach(day => {
+        organizedJadwal[day] = {};
+      });
+
+      jadwal.forEach(j => {
+        if (!organizedJadwal[j.hari]) organizedJadwal[j.hari] = {};
+        if (!organizedJadwal[j.hari][j.ruangan_id]) {
+          organizedJadwal[j.hari][j.ruangan_id] = [];
+        }
+        organizedJadwal[j.hari][j.ruangan_id].push(j);
+      });
+
+      setJadwalData(organizedJadwal);
+    } catch (err) {
+      console.warn('Error fetching filtered data:', err.message);
+      // Fallback: fetch semua data
+      await fetchData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle tahun akademik change
+  useEffect(() => {
+    fetchKurikulum(selectedTahunAkademik);
+    setSelectedKodeKurikulum('');
+    setSelectedSemester('');
+    setSelectedTahunAjaran('');
+    setSelectedKurikulumId('');
+  }, [selectedTahunAkademik]);
+
+  // Handle kurikulum selection (set kurikulum ID ketika kode + tahun ajaran dipilih)
+  useEffect(() => {
+    if (selectedKodeKurikulum && selectedTahunAjaran) {
+      const kurikulum = kurikulumList.find(
+        (k) => k.kode_kurikulum === selectedKodeKurikulum && 
+               String(k.tahun_ajaran) === selectedTahunAjaran
+      );
+      if (kurikulum) {
+        setSelectedKurikulumId(kurikulum.id);
+      }
+    } else {
+      setSelectedKurikulumId('');
+    }
+  }, [selectedKodeKurikulum, selectedTahunAjaran, kurikulumList]);
+
+  // Fetch kelas dan jadwal ketika kurikulum berubah
+  useEffect(() => {
+    fetchKelasAndJadwalByKurikulum(selectedKurikulumId);
+  }, [selectedKurikulumId]);
 
   // Update jam_mulai when preset changes
   useEffect(() => {
@@ -141,9 +417,10 @@ export default function JadwalPage() {
 
   const getBreakTimes = (hari) => {
     const isJumat = hari === 'Jumat';
+    const isSabtu = hari === 'Sabtu';
     return {
-      mulai: isJumat ? settings.jamIstirahatMulaiJumat : settings.jamIstirahatMulaiSeninKamis,
-      selesai: isJumat ? settings.jamIstirahatSelesaiJumat : settings.jamIstirahatSelesaiSeninKamis,
+      mulai: isJumat ? settings.jamIstirahatMulaiJumat : (isSabtu ? settings.jamIstirahatMulaiSabtu : settings.jamIstirahatMulaiSeninKamis),
+      selesai: isJumat ? settings.jamIstirahatSelesaiJumat : (isSabtu ? settings.jamIstirahatSelesaiSabtu : settings.jamIstirahatSelesaiSeninKamis),
     };
   };
 
@@ -501,131 +778,210 @@ export default function JadwalPage() {
     showMessage('success', 'Jadwal diexport ke XLSX');
   };
 
-  const exportToPDF = async () => {
-    try {
-      const element = tableRef.current;
-      if (!element) return;
-
-      const canvas = await html2canvas(element, { 
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('l', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
-      pdf.save(`jadwal_kuliah_${new Date().toISOString().split('T')[0]}.pdf`);
-      showMessage('success', 'Jadwal diexport ke PDF');
-    } catch (err) {
-      showMessage('error', `Error exporting PDF: ${err.message}`);
-    }
-  };
-
-  const exportToJPG = async () => {
-    try {
-      const element = tableRef.current;
-      if (!element) return;
-
-      const canvas = await html2canvas(element, { 
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/jpeg', 0.95);
-      link.download = `jadwal_kuliah_${new Date().toISOString().split('T')[0]}.jpg`;
-      link.click();
-      showMessage('success', 'Jadwal diexport ke JPG');
-    } catch (err) {
-      showMessage('error', `Error exporting JPG: ${err.message}`);
-    }
-  };
-
   if (loading) return <div className="p-8">Loading...</div>;
 
-  const styles = {
-    container: globalStyles.container,
-    card: globalStyles.card,
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '2rem',
-      flexWrap: 'wrap',
-      gap: '1rem',
-    },
-    title: globalStyles.title,
-    subtitle: globalStyles.subtitle,
-    message: globalStyles.message,
-    messageSuccess: globalStyles.messageSuccess,
-    messageError: globalStyles.messageError,
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div style={styles.header}>
-          <div>
-            <h1 style={styles.title}>📅 Jadwal Kuliah</h1>
-            <p style={styles.subtitle}>Kelola jadwal kuliah dengan mudah</p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Jadwal Kuliah</h1>
+          <p className="text-gray-600">Kelola jadwal kuliah dengan mudah</p>
         </div>
 
         {/* Messages */}
         {message.text && (
           <div
-            style={{
-              ...styles.message,
-              ...(message.type === 'success' ? styles.messageSuccess : styles.messageError),
-            }}
+            className={`mb-4 p-4 rounded-lg ${
+              message.type === 'success'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}
           >
-            {message.type === 'success' ? '✓' : '✗'} {message.text}
+            {message.text}
           </div>
         )}
 
+        {/* Filter Section */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          {/* Master Filter: Tahun Akademik */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📅 Tahun Akademik
+            </label>
+            <select
+              value={selectedTahunAkademik}
+              onChange={(e) => setSelectedTahunAkademik(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">-- Pilih Tahun Akademik --</option>
+              {tahunAkademikList.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.tahun_akademik}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subfilters: Kode Kurikulum, Semester, Tahun Ajaran */}
+          {selectedTahunAkademik && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📖 Kode Kurikulum
+                </label>
+                <select
+                  value={selectedKodeKurikulum}
+                  onChange={(e) => setSelectedKodeKurikulum(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Pilih Kode Kurikulum --</option>
+                  {[...new Set(kurikulumList.map(k => k.kode_kurikulum))].map((kode) => (
+                    <option key={kode} value={kode}>
+                      {kode}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📚 Semester
+                </label>
+                <select
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Pilih Semester --</option>
+                  {semesters.map((sem) => (
+                    <option key={sem} value={sem}>
+                      {sem}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📆 Tahun Ajaran
+                </label>
+                <select
+                  value={selectedTahunAjaran}
+                  onChange={(e) => setSelectedTahunAjaran(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Pilih Tahun Ajaran --</option>
+                  {[...new Set(kurikulumList.filter(k => !selectedKodeKurikulum || k.kode_kurikulum === selectedKodeKurikulum).map(k => k.tahun_ajaran))].map((tahun) => (
+                    <option key={tahun} value={tahun}>
+                      {tahun}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Control Panel */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🎛️ Preset Jadwal</h3>
-            <div className="flex flex-wrap gap-3">
-              {Object.keys(presets).map((presetName) => (
-                <button
-                  key={presetName}
-                  onClick={() => {
-                    setActivePreset(presetName);
-                    setSettings(presets[presetName]);
-                    showMessage('success', `Preset ${presetName} diterapkan`);
-                  }}
-                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                    activePreset === presetName
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                  }`}
-                >
-                  {presetName}
-                </button>
-              ))}
+          {/* Preset Header dengan Collapse/Expand */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowPresetsSection(!showPresetsSection)}
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+                title={showPresetsSection ? 'Sembunyikan' : 'Tampilkan'}
+              >
+                <span className="text-xl">
+                  {showPresetsSection ? '▼' : '▶'}
+                </span>
+              </button>
+              <h3 className="text-lg font-semibold text-gray-900">🎛️ Preset Jadwal</h3>
             </div>
+            <button
+              onClick={() => setShowSavePresetModal(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+            >
+              💾 Simpan Preset
+            </button>
           </div>
+
+          {/* Preset Section (Collapsible) */}
+          {showPresetsSection && (
+            <div className="space-y-4">
+              {/* Default Presets */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Template Preset</p>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {Object.keys(presets).map((presetName) => (
+                    <button
+                      key={presetName}
+                      onClick={() => {
+                        setActivePreset(presetName);
+                        setSettings(presets[presetName]);
+                        showMessage('success', `Preset ${presetName} diterapkan`);
+                      }}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        activePreset === presetName
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                      }`}
+                    >
+                      {presetName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Database Presets */}
+              {databasePresets.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Preset Tersimpan</p>
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {databasePresets.map((preset) => (
+                      <div key={preset.id} className="relative group">
+                        <button
+                          onClick={() => {
+                            setActivePreset(preset.nama_preset);
+                            setSettings({
+                              jamMulai: preset.jam_mulai,
+                              durasiSlot: preset.durasi_slot,
+                              jamIstirahatMulaiSeninKamis: preset.jam_istirahat_mulai_senin_kamis,
+                              jamIstirahatSelesaiSeninKamis: preset.jam_istirahat_selesai_senin_kamis,
+                              jamIstirahatMulaiJumat: preset.jam_istirahat_mulai_jumat,
+                              jamIstirahatSelesaiJumat: preset.jam_istirahat_selesai_jumat,
+                              jamSelesai: preset.jam_selesai,
+                            });
+                            showMessage('success', `Preset ${preset.nama_preset} diterapkan`);
+                          }}
+                          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                            activePreset === preset.nama_preset
+                              ? 'bg-blue-600 text-white shadow-lg'
+                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                          }`}
+                        >
+                          {preset.nama_preset}
+                        </button>
+                        {!preset.is_default && (
+                          <button
+                            onClick={() => handleDeletePreset(preset.id, preset.nama_preset)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold hover:bg-red-600"
+                            title="Hapus preset"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Settings Divider */}
+          {showPresetsSection && <div className="border-t border-gray-200 mb-6 mt-6" />}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Jam Mulai */}
@@ -692,6 +1048,54 @@ export default function JadwalPage() {
               </div>
             </div>
 
+            {/* Jam Istirahat Sabtu */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Istirahat Sabtu
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  value={settings.jamIstirahatMulaiSabtu}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      jamIstirahatMulaiSabtu: e.target.value,
+                    })
+                  }
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                />
+                <span className="flex items-center">-</span>
+                <input
+                  type="time"
+                  value={settings.jamIstirahatSelesaiSabtu}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      jamIstirahatSelesaiSabtu: e.target.value,
+                    })
+                  }
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+
+            {/* Jam Selesai */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Jam Selesai
+              </label>
+              <input
+                type="time"
+                value={settings.jamSelesai}
+                onChange={(e) =>
+                  setSettings({ ...settings, jamSelesai: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+
+            <div></div>
             {/* Jam Istirahat Jumat */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -723,21 +1127,6 @@ export default function JadwalPage() {
                 />
               </div>
             </div>
-
-            {/* Jam Selesai */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Jam Selesai
-              </label>
-              <input
-                type="time"
-                value={settings.jamSelesai}
-                onChange={(e) =>
-                  setSettings({ ...settings, jamSelesai: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
           </div>
 
           {/* Action Buttons */}
@@ -760,18 +1149,17 @@ export default function JadwalPage() {
             >
               📊 Export XLSX
             </button>
-            <button
-              onClick={exportToPDF}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              📄 Export PDF
-            </button>
-            <button
-              onClick={exportToJPG}
-              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-            >
-              🖼️ Export JPG
-            </button>
+            
+            {/* Save Preset Changes Button - hanya tampil jika ada perubahan */}
+            {hasPresetChanges() && (
+              <button
+                onClick={handleUpdatePreset}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium"
+                title={`Simpan perubahan ke preset "${activePreset}"`}
+              >
+                💾 Simpan Perubahan
+              </button>
+            )}
           </div>
         </div>
 
@@ -809,8 +1197,8 @@ export default function JadwalPage() {
               return (
                 <div key={day} className="mb-8">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">{day}</h3>
-                    <span className="text-sm text-gray-500">
+                    <h3 className="text-lg font-semibold text-black">{day}</h3>
+                    <span className="text-sm text-black">
                       {Object.values(dayData).flat().length} sesi
                     </span>
                   </div>
@@ -819,12 +1207,12 @@ export default function JadwalPage() {
                     <table className="w-full border-collapse border border-gray-300 table-fixed">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-4 py-2 text-left w-32">Ruangan</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left w-32 text-black">Ruangan</th>
                           {timeSlots.map((slot, idx) => (
                             <th
                               key={idx}
-                              className={`border border-gray-300 px-2 py-2 text-center text-xs w-24 h-20 ${
-                                slot.isBreak ? 'bg-yellow-100' : 'bg-blue-50'
+                              className={`border border-gray-300 px-2 py-2 text-center text-xs w-24 h-20 text-black ${
+                                slot.isBreak ? 'bg-red-400' : 'bg-blue-50'
                               }`}
                             >
                               <div>{slot.start}</div>
@@ -837,7 +1225,7 @@ export default function JadwalPage() {
                       <tbody>
                         {[...ruanganList].sort((a, b) => (a.f_namaruang || '').localeCompare(b.f_namaruang || '')).map((ruangan) => (
                           <tr key={ruangan.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-2 font-medium w-32">
+                            <td className="border border-gray-300 px-4 py-2 font-medium w-32 text-black">
                               {ruangan.f_namaruang}
                             </td>
                             {timeSlots.map((slot, idx) => {
@@ -865,7 +1253,7 @@ export default function JadwalPage() {
                                   key={idx}
                                   className={`border border-gray-300 px-2 py-2 text-center text-xs h-24 w-24 relative ${
                                     slot.isBreak
-                                      ? 'bg-yellow-50'
+                                      ? 'bg-red-300'
                                       : isOccupied
                                         ? 'bg-green-100'
                                         : 'bg-white hover:bg-blue-50'
@@ -879,10 +1267,10 @@ export default function JadwalPage() {
                                   }}
                                 >
                                   {slot.isBreak ? (
-                                    <div className="text-yellow-700 font-semibold">ISTIRAHAT</div>
+                                    <div className="text-black font-semibold">ISTIRAHAT</div>
                                   ) : sessionInSlot ? (
                                     <div className="w-full h-full flex flex-col items-center justify-center p-1 group">
-                                      <div className="font-semibold text-gray-900 text-xs mb-1 text-center break-words">
+                                      <div className="font-semibold text-black text-xs mb-1 text-center break-words">
                                         {sessionInSlot.display_name}
                                       </div>
                                       <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -924,7 +1312,7 @@ export default function JadwalPage() {
                                     </div>
                                   ) : isOccupied && occupyingSession ? (
                                     <div 
-                                      className="w-full h-full flex flex-col items-center justify-center p-1 text-gray-500 text-xs group cursor-pointer hover:bg-green-200"
+                                      className="w-full h-full flex flex-col items-center justify-center p-1 text-black text-xs group cursor-pointer hover:bg-green-200"
                                       onClick={() => {
                                         setEditingSession(occupyingSession);
                                         setSessionInput(
@@ -1078,93 +1466,57 @@ export default function JadwalPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
-                {/* Jam Mulai */}
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">Jam Mulai</label>
-                  {selectedRuangan && selectedHari ? (
-                    <select
-                      value={selectedJamMulai}
-                      onChange={(e) => {
-                        setSelectedJamMulai(e.target.value);
-                        if (selectedKelas) {
-                          const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
-                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
-                        } else {
-                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Pilih Jam</option>
-                      {generateTimeSlots(selectedHari).map((slot, idx) => {
-                        const isOccupied = isSlotOccupied(selectedHari, parseInt(selectedRuangan), slot.start, slot.end);
-                        const isBreak = slot.isBreak;
-                        if (isOccupied || isBreak) return null;
-                        return (
-                          <option key={idx} value={slot.start}>
-                            {slot.start} - {slot.end}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  ) : (
-                    <input
-                      type="time"
-                      value={selectedJamMulai}
-                      onChange={(e) => {
-                        setSelectedJamMulai(e.target.value);
-                        if (selectedKelas) {
-                          const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
-                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
-                        } else {
-                          setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Pilih ruangan & hari terlebih dahulu"
-                    />
-                  )}
-                </div>
-
-                {/* Jam Selesai */}
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">
-                    Jam Selesai (Otomatis)
-                  </label>
-                  <input
-                    type="time"
-                    value={calculatedJamSelesai}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
-                  />
-
-                  {selectedKelas && (
-                    <small className="text-gray-600 text-xs mt-1 block">
-                      📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit
-                    </small>
-                  )}
-                </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Jam Mulai</label>
+                <input
+                  type="time"
+                  value={selectedJamMulai}
+                  onChange={(e) => {
+                    setSelectedJamMulai(e.target.value);
+                    if (selectedKelas) {
+                      const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
+                      setCalculatedJamSelesai(calculateJamSelesai(e.target.value, sks));
+                    } else {
+                      setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
               </div>
 
-              {/* WARNING jika kelas 2+ SKS terpotong jam istirahat */}
-              {selectedKelas && (() => {
-                const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
-                if (sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks)) {
-                  const breakTimes = getBreakTimes(selectedHari);
-                  return (
-                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm font-medium text-red-800 mb-1">❌ Jadwal Tidak Valid</p>
-                      <p className="text-xs text-red-700">
-                        Kelas dengan <strong>{sks} SKS</strong> tidak boleh terpotong jam istirahat 
-                        <br />
-                        <strong>{breakTimes.mulai}-{breakTimes.selesai}</strong>
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+              <div>
+                <label className="block text-sm font-medium mb-2">Jam Selesai (Otomatis)</label>
+                <input
+                  type="time"
+                  value={calculatedJamSelesai}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
+                />
+                {selectedKelas && (
+                  <small className="text-gray-600 text-xs mt-1 block">
+                    📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit
+                  </small>
+                )}
+                
+                {/* Warning jika kelas 2+ SKS terpotong jam istirahat */}
+                {selectedKelas && (() => {
+                  const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1;
+                  if (sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks)) {
+                    const breakTimes = getBreakTimes(selectedHari);
+                    return (
+                      <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm font-medium text-red-800 mb-1">❌ Jadwal Tidak Valid</p>
+                        <p className="text-xs text-red-700">
+                          Kelas dengan <strong>{sks} SKS</strong> tidak boleh terpotong jam istirahat 
+                          <br />
+                          <strong>{breakTimes.mulai}-{breakTimes.selesai}</strong>
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -1357,6 +1709,64 @@ export default function JadwalPage() {
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
                 Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Preset Modal */}
+      {showSavePresetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">💾 Simpan Preset Baru</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Nama Preset</label>
+                <input
+                  type="text"
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  placeholder="Contoh: Preset Pagi, Preset Sore"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSavePreset();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Konfigurasi yang akan disimpan:</strong>
+                </p>
+                <ul className="text-xs text-gray-600 mt-2 space-y-1">
+                  <li>Jam Mulai: <span className="font-mono">{settings.jamMulai}</span></li>
+                  <li>Durasi Slot: <span className="font-mono">{settings.durasiSlot} menit</span></li>
+                  <li>Jam Selesai: <span className="font-mono">{settings.jamSelesai}</span></li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowSavePresetModal(false);
+                  setNewPresetName('');
+                }}
+                disabled={presetSaving}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSavePreset}
+                disabled={presetSaving || !newPresetName.trim()}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {presetSaving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>

@@ -42,6 +42,58 @@ function validateRow(row, rowIndex) {
   return errors;
 }
 
+// Generate Excel template
+export async function GET(req) {
+  try {
+    const templateData = [
+      {
+        f_nidn: '123456789',
+        f_nip: '987654321',
+        f_title_depan: 'Dr.',
+        f_namapegawai: 'Contoh Dosen',
+        f_title_belakang: 'S.Kom, M.Sc',
+        f_tempatlahir: 'Jakarta',
+        f_tanggallahir: '1990-01-01',
+        f_jeniskelamin: 'L',
+        f_progdi_id: 'TIF',
+      }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 15 }, // f_nidn
+      { wch: 15 }, // f_nip
+      { wch: 12 }, // f_title_depan
+      { wch: 20 }, // f_namapegawai
+      { wch: 20 }, // f_title_belakang
+      { wch: 15 }, // f_tempatlahir
+      { wch: 15 }, // f_tanggallahir
+      { wch: 15 }, // f_jeniskelamin
+      { wch: 12 }, // f_progdi_id
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Dosen');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Disposition': 'attachment; filename="template_dosen_import.xlsx"',
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    });
+  } catch (error) {
+    console.error('❌ Template generation error:', error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req) {
   try {
     const formData = await req.formData();
@@ -125,11 +177,6 @@ export async function POST(req) {
             f_tanggallahir: excelDateToJSDate(row.f_tanggallahir),
             f_jeniskelamin: row.f_jeniskelamin ? row.f_jeniskelamin.toString().trim() : null,
             f_progdi_id: row.f_progdi_id ? row.f_progdi_id.toString().trim() : null,
-            prefer_lantai: row.prefer_lantai ? row.prefer_lantai.toString().trim() : null,
-            prefer_hari: row.prefer_hari ? row.prefer_hari.toString().trim() : null,
-            avoid_hari: row.avoid_hari ? row.avoid_hari.toString().trim() : null,
-            prefer_jam_mulai: row.prefer_jam_mulai ? row.prefer_jam_mulai.toString().trim() : null,
-            prefer_jam_selesai: row.prefer_jam_selesai ? row.prefer_jam_selesai.toString().trim() : null,
           };
 
           await trx('dosen').insert(data);

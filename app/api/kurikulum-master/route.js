@@ -17,6 +17,7 @@ export async function POST(req) {
         kode_kurikulum: body.kode_kurikulum,
         nama_kurikulum: body.nama_kurikulum,
         tahun_ajaran: body.tahun_ajaran,
+        f_tahun_akademik: body.f_tahun_akademik,
       })
       .returning('*'); // 🔥 ambil semua
 

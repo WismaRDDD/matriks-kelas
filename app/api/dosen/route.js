@@ -1,7 +1,7 @@
 import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
-// GET: ambil semua dosen dengan semua field
+// GET: ambil semua dosen dengan semua field biodata
 export async function GET() {
   try {
     const data = await knex('dosen')
@@ -16,11 +16,6 @@ export async function GET() {
         'f_tanggallahir',
         'f_jeniskelamin',
         'f_progdi_id',
-        'prefer_lantai',
-        'prefer_hari',
-        'avoid_hari',
-        'prefer_jam_mulai',
-        'prefer_jam_selesai',
         'created_at',
         'updated_at'
       )
