@@ -587,7 +587,7 @@ export default function KelasPage() {
               }}
               onClick={() => setActiveTab('view')}
             >
-              📋 Lihat Data Kelas
+              📋 Data KRS Matakuliah
             </button>
             <button
               style={{
@@ -1054,6 +1054,7 @@ export default function KelasPage() {
                 borderLeft: '4px solid #38b2ac',
                 borderRadius: '4px',
                 fontSize: '0.9rem',
+                color: '#000000',
               }}>
                 ℹ️ Menampilkan mata kuliah untuk semester <strong>{selectedSemester === 'gasal' ? 'GASAL (1,3,5,7)' : 'GENAP (2,4,6,8)'}</strong>
               </div>

@@ -47,6 +47,8 @@ export async function POST(req) {
       durasi_slot: body.durasiSlot,
       jam_istirahat_mulai_senin_kamis: body.jamIstirahatMulaiSeninKamis,
       jam_istirahat_selesai_senin_kamis: body.jamIstirahatSelesaiSeninKamis,
+      jam_istirahat_mulai_sabtu: body.jamIstirahatMulaiSabtu,
+      jam_istirahat_selesai_sabtu: body.jamIstirahatSelesaiSabtu,
       jam_istirahat_mulai_jumat: body.jamIstirahatMulaiJumat,
       jam_istirahat_selesai_jumat: body.jamIstirahatSelesaiJumat,
       jam_selesai: body.jamSelesai,
@@ -55,6 +57,13 @@ export async function POST(req) {
 
     const result = await knex('presets').insert(insertData);
     const id = result[0];
+
+    // Set ini sebagai default dan unset yang lain
+    if (insertData.is_default) {
+      await knex('presets')
+        .where('id', '!=', id)
+        .update({ is_default: false });
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -94,11 +103,26 @@ export async function PUT(req) {
       );
     }
 
+    // Jika set_as_default = true, set ini sebagai default dan unset yang lain
+    if (body.set_as_default) {
+      await knex('presets').update({ is_default: false });
+      await knex('presets')
+        .where({ id: body.id })
+        .update({ is_default: true });
+
+      return NextResponse.json({ 
+        success: true,
+        message: 'Preset dijadikan default'
+      });
+    }
+
     const updateData = {
       jam_mulai: body.jam_mulai,
       durasi_slot: body.durasiSlot,
       jam_istirahat_mulai_senin_kamis: body.jamIstirahatMulaiSeninKamis,
       jam_istirahat_selesai_senin_kamis: body.jamIstirahatSelesaiSeninKamis,
+      jam_istirahat_mulai_sabtu: body.jamIstirahatMulaiSabtu,
+      jam_istirahat_selesai_sabtu: body.jamIstirahatSelesaiSabtu,
       jam_istirahat_mulai_jumat: body.jamIstirahatMulaiJumat,
       jam_istirahat_selesai_jumat: body.jamIstirahatSelesaiJumat,
       jam_selesai: body.jamSelesai,

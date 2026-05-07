@@ -567,7 +567,7 @@ export default function KurikulumPage() {
               style={styles.input}
               placeholder="Kode Kurikulum *"
               value={form.kode_kurikulum}
-              onChange={(e) => setForm({ ...form, kode_kurikulum: e.target.value })}
+              onChange={(e) => setForm({ ...form, kode_kurikulum: e.target.value.replace(/\s/g, '') })}
             />
             
             <input
@@ -581,7 +581,7 @@ export default function KurikulumPage() {
               style={styles.input}
               placeholder="Tahun Ajaran (contoh: 2024)"
               value={form.tahun_ajaran}
-              onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
+              onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value.replace(/[^0-9]/g, '') })}
             />
             
             <div style={styles.modalActions}>

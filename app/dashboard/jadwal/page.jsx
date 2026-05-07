@@ -52,7 +52,7 @@ export default function JadwalPage() {
   // Session input
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [sessionInput, setSessionInput] = useState('');
-  const [sessionInputMode, setSessionInputMode] = useState('manual'); // 'manual' or 'import'
+  const [sessionInputMode, setSessionInputMode] = useState('import'); // 'manual' or 'import'
   const [selectedRuangan, setSelectedRuangan] = useState('');
   const [selectedHari, setSelectedHari] = useState('Senin');
   const [selectedJamMulai, setSelectedJamMulai] = useState('07:10');
@@ -80,10 +80,7 @@ export default function JadwalPage() {
   const [tahunAkademikList, setTahunAkademikList] = useState([]);
   const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
   const [kurikulumList, setKurikulumList] = useState([]);
-  const [selectedKodeKurikulum, setSelectedKodeKurikulum] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState('');
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState('');
-  const [selectedKurikulumId, setSelectedKurikulumId] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('Gasal');
 
   const tableRef = useRef(null);
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -138,12 +135,29 @@ export default function JadwalPage() {
     fetchPresets();
   }, []);
 
-  // Fetch presets dari database
+  // Fetch presets dari database dan set default preset
   const fetchPresets = async () => {
     try {
       const res = await fetch('/api/preset');
       const data = await res.json();
       setDatabasePresets(data);
+      
+      // Cari preset yang marked as default
+      const defaultPreset = data.find(p => p.is_default);
+      if (defaultPreset) {
+        setActivePreset(defaultPreset.nama_preset);
+        setSettings({
+          jamMulai: defaultPreset.jam_mulai,
+          durasiSlot: defaultPreset.durasi_slot,
+          jamIstirahatMulaiSeninKamis: defaultPreset.jam_istirahat_mulai_senin_kamis,
+          jamIstirahatSelesaiSeninKamis: defaultPreset.jam_istirahat_selesai_senin_kamis,
+          jamIstirahatMulaiSabtu: defaultPreset.jam_istirahat_mulai_sabtu,
+          jamIstirahatSelesaiSabtu: defaultPreset.jam_istirahat_selesai_sabtu,
+          jamIstirahatMulaiJumat: defaultPreset.jam_istirahat_mulai_jumat,
+          jamIstirahatSelesaiJumat: defaultPreset.jam_istirahat_selesai_jumat,
+          jamSelesai: defaultPreset.jam_selesai,
+        });
+      }
     } catch (error) {
       console.warn('Gagal fetch presets dari database:', error.message);
     }
@@ -177,7 +191,7 @@ export default function JadwalPage() {
           jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat,
           jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat,
           jamSelesai: settings.jamSelesai,
-          is_default: false,
+          is_default: true,
         })
       });
 
@@ -188,7 +202,7 @@ export default function JadwalPage() {
         return;
       }
 
-      showMessage('success', `Preset "${newPresetName}" berhasil disimpan`);
+      showMessage('success', `Preset "${newPresetName}" berhasil disimpan dan menjadi preset default`);
       setNewPresetName('');
       setShowSavePresetModal(false);
       await fetchPresets();
@@ -218,6 +232,32 @@ export default function JadwalPage() {
       }
 
       showMessage('success', `Preset "${presetName}" berhasil dihapus`);
+      await fetchPresets();
+    } catch (err) {
+      showMessage('error', `Error: ${err.message}`);
+    }
+  };
+
+  // Set preset sebagai default
+  const handleSetAsDefault = async (presetId, presetName) => {
+    try {
+      const res = await fetch('/api/preset', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: presetId,
+          set_as_default: true
+        })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage('error', result.error || 'Gagal mengubah default preset');
+        return;
+      }
+
+      showMessage('success', `Preset "${presetName}" menjadi preset default`);
       await fetchPresets();
     } catch (err) {
       showMessage('error', `Error: ${err.message}`);
@@ -311,30 +351,51 @@ export default function JadwalPage() {
     }
   };
 
-  // Fetch kelas dan jadwal berdasarkan kurikulum
-  const fetchKelasAndJadwalByKurikulum = async (kurikulumId) => {
-    if (!kurikulumId) {
-      // Jika tidak ada kurikulum, fetch semua data seperti biasa
-      await fetchData();
-      return;
+  // Helper function to convert Gasal/Genap to semester numbers
+  const getSemesterNumbers = (semesterLabel) => {
+    // Gasal (odd): 1, 3, 5, 7, 9, ...
+    // Genap (even): 2, 4, 6, 8, 10, ...
+    if (semesterLabel === 'Gasal') {
+      return [1, 3, 5, 7, 9];
+    } else if (semesterLabel === 'Genap') {
+      return [2, 4, 6, 8, 10];
     }
+    return [];
+  };
+
+  // Fetch kelas dan jadwal berdasarkan semester dari semua kurikulum
+  const fetchKelasAndJadwalBySemester = async (tahunId, semester) => {
     try {
       setLoading(true);
-      // Fetch kelas dan jadwal spesifik untuk kurikulum
+      // Fetch all kelas and jadwal
       const [kelasRes, jadwalRes] = await Promise.all([
-        fetch(`/api/kelas?kurikulum_id=${kurikulumId}`),
-        fetch(`/api/jadwal?kurikulum_id=${kurikulumId}`)
+        fetch('/api/kelas'),
+        fetch('/api/jadwal')
       ]);
 
       if (!kelasRes.ok || !jadwalRes.ok) {
-        // Jika endpoint dengan parameter tidak support, fallback ke fetch semua data
-        console.warn('API dengan kurikulum_id parameter tidak tersupport, menggunakan data semua kurikulum');
-        await fetchData();
+        console.warn('Failed to fetch kelas and jadwal');
         return;
       }
 
-      const kelas = await kelasRes.json();
-      const jadwal = await jadwalRes.json();
+      let kelas = await kelasRes.json();
+      let jadwal = await jadwalRes.json();
+
+      // Convert semester label (Gasal/Genap) to numbers
+      const semesterNumbers = getSemesterNumbers(semester);
+
+      // Filter kelas by kurikulum that has the selected tahun akademik and semester
+      kelas = kelas.filter(k => {
+        const kurikulum = kurikulumList.find(ku => ku.id === k.f_kurikulum);
+        const kSemester = Number(k.semester);
+        return kurikulum && 
+               String(kurikulum.f_tahun_akademik) === String(tahunId) && 
+               semesterNumbers.includes(kSemester);
+      });
+
+      // Filter jadwal to only include kelas from filtered list
+      const kelasIds = kelas.map(k => k.id);
+      jadwal = jadwal.filter(j => kelasIds.includes(j.f_kelas));
 
       setKelasList(kelas);
 
@@ -355,8 +416,6 @@ export default function JadwalPage() {
       setJadwalData(organizedJadwal);
     } catch (err) {
       console.warn('Error fetching filtered data:', err.message);
-      // Fallback: fetch semua data
-      await fetchData();
     } finally {
       setLoading(false);
     }
@@ -364,32 +423,21 @@ export default function JadwalPage() {
 
   // Handle tahun akademik change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchKurikulum(selectedTahunAkademik);
-    setSelectedKodeKurikulum('');
-    setSelectedSemester('');
-    setSelectedTahunAjaran('');
-    setSelectedKurikulumId('');
+    setSelectedSemester('Gasal');
   }, [selectedTahunAkademik]);
 
-  // Handle kurikulum selection (set kurikulum ID ketika kode + tahun ajaran dipilih)
+  // Fetch kelas dan jadwal ketika semester dipilih
   useEffect(() => {
-    if (selectedKodeKurikulum && selectedTahunAjaran) {
-      const kurikulum = kurikulumList.find(
-        (k) => k.kode_kurikulum === selectedKodeKurikulum && 
-               String(k.tahun_ajaran) === selectedTahunAjaran
-      );
-      if (kurikulum) {
-        setSelectedKurikulumId(kurikulum.id);
-      }
+    if (selectedTahunAkademik && selectedSemester) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      fetchKelasAndJadwalBySemester(selectedTahunAkademik, selectedSemester);
     } else {
-      setSelectedKurikulumId('');
+      setKelasList([]);
+      setJadwalData({});
     }
-  }, [selectedKodeKurikulum, selectedTahunAjaran, kurikulumList]);
-
-  // Fetch kelas dan jadwal ketika kurikulum berubah
-  useEffect(() => {
-    fetchKelasAndJadwalByKurikulum(selectedKurikulumId);
-  }, [selectedKurikulumId]);
+  }, [selectedTahunAkademik, selectedSemester]);
 
   // Update jam_mulai when preset changes
   useEffect(() => {
@@ -509,6 +557,34 @@ export default function JadwalPage() {
     // Cek apakah session overlap dengan jam istirahat
     // Overlap terjadi jika: sessionStart < breakEnd DAN sessionEnd > breakStart
     return sessionStartMin < breakEndMin && sessionEndMin > breakStartMin;
+  };
+
+  // Check untuk overlapping sessions dengan kelas yang sudah ada
+  const findOverlappingSession = (hari, ruanganId, jamMulai, jamSelesai) => {
+    const dayData = jadwalData[hari] || {};
+    const sessionsInRuangan = dayData[parseInt(ruanganId)] || [];
+    
+    const newStart = timeToMinutes(jamMulai);
+    const newEnd = timeToMinutes(jamSelesai);
+
+    for (const existingSession of sessionsInRuangan) {
+      // Skip if editing same session
+      if (editingSession && existingSession.id === editingSession.id) continue;
+      
+      const existingStart = timeToMinutes(existingSession.jam_mulai);
+      const existingEnd = timeToMinutes(existingSession.jam_selesai);
+      
+      // Overlap terjadi jika: newStart < existingEnd DAN newEnd > existingStart
+      if (newStart < existingEnd && newEnd > existingStart) {
+        return {
+          found: true,
+          conflictName: existingSession.display_name,
+          conflictTime: `${existingSession.jam_mulai}-${existingSession.jam_selesai}`
+        };
+      }
+    }
+    
+    return { found: false };
   };
 
   // ===== SESSION MANAGEMENT =====
@@ -645,18 +721,16 @@ export default function JadwalPage() {
       const dosenList = await dosenRes.json();
 
       // Hitung preference level untuk setiap dosen
-      const dosenWithLevel = dosenList.map(d => {
+      const dosenMap = {};
+      dosenList.forEach(d => {
         let level = 0;
         if (d.prefer_hari) level += 3;
         if (d.prefer_jam_mulai) level += 2;
         if (d.prefer_lantai) level += 1;
-        return { ...d, preferenceLevel: level };
+        dosenMap[d.id] = { ...d, preferenceLevel: level };
       });
 
-      // Sort by preference level (tertinggi dulu)
-      dosenWithLevel.sort((a, b) => b.preferenceLevel - a.preferenceLevel);
-
-      // Generate sesi untuk setiap kelas yang belum dijadwalkan
+      // Ambil kelas yang belum dijadwalkan
       const emptyKelas = kelasList.filter(k => {
         const hasSchedule = days.some(day =>
           jadwalData[day] && Object.values(jadwalData[day]).some(arr =>
@@ -666,43 +740,159 @@ export default function JadwalPage() {
         return !hasSchedule;
       });
 
-      let generated = 0;
-      for (const kelas of emptyKelas) {
-        // Cari dosen yang sesuai preferensi
-        const preferredDosen = dosenWithLevel[generated % dosenWithLevel.length];
-        const hari = autoGenSettings.usePreferences && preferredDosen.prefer_hari
-          ? preferredDosen.prefer_hari.split(',')[0].trim()
-          : days[generated % 5];
+      // Tambah preference level ke setiap kelas berdasarkan dosennya
+      const kelasWithPreference = emptyKelas.map(k => {
+        const dosen = k.f_dosen ? dosenMap[k.f_dosen] : null;
+        return {
+          ...k,
+          preferenceLevel: dosen ? dosen.preferenceLevel : 0,
+          dosenData: dosen
+        };
+      });
 
-        // Pilih ruangan (dengan preferensi lantai jika ada)
-        let ruangan = ruanganList[generated % ruanganList.length];
-        if (autoGenSettings.usePreferences && preferredDosen.prefer_lantai) {
-          const preferredRuangan = ruanganList.find(
-            r => r.f_lantai === parseInt(preferredDosen.prefer_lantai)
-          );
-          ruangan = preferredRuangan || ruangan;
+      // Sort: priority dosen dengan preference tinggi dulu, baru kelas tanpa preference
+      kelasWithPreference.sort((a, b) => b.preferenceLevel - a.preferenceLevel);
+
+      let generated = 0;
+      let skipped = 0;
+
+      // Function untuk schedule kelas dengan try-all combinations
+      const scheduleKelas = async (kelas, dosenData) => {
+        const sks = kelas.sks || kelas.f_sks_kurikulum || 1;
+
+        // Jika ada preferensi dosen, coba kombinasi yang sesuai preferensi dulu
+        let hariList = days;
+        let ruanganList_ = ruanganList;
+        let jamMulaiList = [];
+
+        // Generate semua slot waktu
+        let allTimeSlots = [];
+        let currentMinutes = timeToMinutes(settings.jamMulai);
+        const endMinutes = timeToMinutes(settings.jamSelesai);
+        const slotDuration = settings.durasiSlot || 60;
+        
+        while (currentMinutes < endMinutes) {
+          allTimeSlots.push(minutesToTime(currentMinutes));
+          currentMinutes += slotDuration;
         }
 
-        const jadwalPayload = {
-          kelas_id: kelas.id,
-          hari: hari,
-          ruangan_id: ruangan.id,
-          jam_mulai: preferredDosen.prefer_jam_mulai || '07:00',
-          jam_selesai: preferredDosen.prefer_jam_selesai || '12:00',
-          dosen_id: preferredDosen.id,
-          display_name: kelas.display_name || kelas.nama_kelas
-        };
+        if (dosenData && autoGenSettings.usePreferences) {
+          // Prioritas hari sesuai preferensi
+          if (dosenData.prefer_hari) {
+            const preferredHari = dosenData.prefer_hari.split(',').map(h => h.trim());
+            hariList = [
+              ...preferredHari.filter(h => days.includes(h)),
+              ...days.filter(h => !preferredHari.includes(h))
+            ];
+          }
 
-        const res = await fetch('/api/jadwal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(jadwalPayload)
-        });
+          // Prioritas ruangan sesuai lantai
+          if (dosenData.prefer_lantai) {
+            const preferredLantai = parseInt(dosenData.prefer_lantai);
+            ruanganList_ = [
+              ...ruanganList.filter(r => r.f_lantai === preferredLantai),
+              ...ruanganList.filter(r => r.f_lantai !== preferredLantai)
+            ];
+          }
 
-        if (res.ok) generated++;
+          // Prioritas jam sesuai preferensi
+          if (dosenData.prefer_jam_mulai) {
+            jamMulaiList = [
+              dosenData.prefer_jam_mulai,
+              ...allTimeSlots.filter(t => t !== dosenData.prefer_jam_mulai)
+            ];
+          } else {
+            jamMulaiList = allTimeSlots;
+          }
+        } else {
+          // Jika tidak ada dosen/preferensi, gunakan semua slot
+          jamMulaiList = allTimeSlots;
+        }
+
+        // Try-all combinations untuk menemukan slot yang cocok
+        for (const hari of hariList) {
+          for (const jamMulai of jamMulaiList) {
+            const jamSelesai = calculateJamSelesai(jamMulai, sks);
+
+            // Skip jika jam selesai melebihi jam kerja
+            if (timeToMinutes(jamSelesai) > timeToMinutes(settings.jamSelesai)) {
+              continue;
+            }
+
+            for (const ruangan of ruanganList_) {
+              // VALIDASI: Cek break time
+              if (sks >= 2 && isSessionCutByBreak(hari, jamMulai, jamSelesai, sks)) {
+                continue;
+              }
+
+              // VALIDASI: Cek overlap
+              const dayData = jadwalData[hari] || {};
+              const sessionsInRuangan = dayData[ruangan.id] || [];
+              const newStart = timeToMinutes(jamMulai);
+              const newEnd = timeToMinutes(jamSelesai);
+
+              let hasOverlap = false;
+              for (const existingSession of sessionsInRuangan) {
+                const existingStart = timeToMinutes(existingSession.jam_mulai);
+                const existingEnd = timeToMinutes(existingSession.jam_selesai);
+                if (newStart < existingEnd && newEnd > existingStart) {
+                  hasOverlap = true;
+                  break;
+                }
+              }
+
+              if (hasOverlap) continue;
+
+              // ===== SEMUA VALIDASI PASSED - TAMBAH SESI =====
+              const selectedDosen = dosenData || dosenList[generated % dosenList.length];
+              const jadwalPayload = {
+                kelas_id: kelas.id,
+                hari: hari,
+                ruangan_id: ruangan.id,
+                jam_mulai: jamMulai,
+                jam_selesai: jamSelesai,
+                dosen_id: selectedDosen.id,
+                display_name: kelas.display_name || kelas.nama_kelas
+              };
+
+              const res = await fetch('/api/jadwal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jadwalPayload)
+              });
+
+              if (res.ok) {
+                // Update jadwalData
+                if (!jadwalData[hari]) jadwalData[hari] = {};
+                if (!jadwalData[hari][ruangan.id]) jadwalData[hari][ruangan.id] = [];
+                jadwalData[hari][ruangan.id].push({
+                  id: Math.random(),
+                  kelas_id: kelas.id,
+                  jam_mulai: jamMulai,
+                  jam_selesai: jamSelesai,
+                  display_name: jadwalPayload.display_name
+                });
+                return true; // Success
+              }
+            }
+          }
+        }
+
+        return false; // Failed
+      };
+
+      // Generate dengan urutan prioritas: preference dulu, baru random
+      for (const kelas of kelasWithPreference) {
+        const success = await scheduleKelas(kelas, kelas.dosenData);
+        if (success) {
+          generated++;
+        } else {
+          skipped++;
+        }
       }
 
-      showMessage('success', `${generated} sesi berhasil dibuat otomatis`);
+      const message = `${generated} sesi berhasil dibuat otomatis${skipped > 0 ? ` (${skipped} kelas tidak bisa dijadwalkan)` : ''}`;
+      showMessage('success', message);
       setShowAutoGenModal(false);
       await fetchData();
     } catch (err) {
@@ -812,7 +1002,7 @@ export default function JadwalPage() {
             <select
               value={selectedTahunAkademik}
               onChange={(e) => setSelectedTahunAkademik(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
             >
               <option value="">-- Pilih Tahun Akademik --</option>
               {tahunAkademikList.map((t) => (
@@ -825,60 +1015,21 @@ export default function JadwalPage() {
 
           {/* Subfilters: Kode Kurikulum, Semester, Tahun Ajaran */}
           {selectedTahunAkademik && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  📖 Kode Kurikulum
-                </label>
-                <select
-                  value={selectedKodeKurikulum}
-                  onChange={(e) => setSelectedKodeKurikulum(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">-- Pilih Kode Kurikulum --</option>
-                  {[...new Set(kurikulumList.map(k => k.kode_kurikulum))].map((kode) => (
-                    <option key={kode} value={kode}>
-                      {kode}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  📚 Semester
-                </label>
-                <select
-                  value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">-- Pilih Semester --</option>
-                  {semesters.map((sem) => (
-                    <option key={sem} value={sem}>
-                      {sem}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  📆 Tahun Ajaran
-                </label>
-                <select
-                  value={selectedTahunAjaran}
-                  onChange={(e) => setSelectedTahunAjaran(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">-- Pilih Tahun Ajaran --</option>
-                  {[...new Set(kurikulumList.filter(k => !selectedKodeKurikulum || k.kode_kurikulum === selectedKodeKurikulum).map(k => k.tahun_ajaran))].map((tahun) => (
-                    <option key={tahun} value={tahun}>
-                      {tahun}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📚 Semester
+              </label>
+              <select
+                value={selectedSemester}
+                onChange={(e) => setSelectedSemester(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
+              >
+                {semesters.map((sem) => (
+                  <option key={sem} value={sem}>
+                    {sem}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>
@@ -949,6 +1100,8 @@ export default function JadwalPage() {
                               durasiSlot: preset.durasi_slot,
                               jamIstirahatMulaiSeninKamis: preset.jam_istirahat_mulai_senin_kamis,
                               jamIstirahatSelesaiSeninKamis: preset.jam_istirahat_selesai_senin_kamis,
+                              jamIstirahatMulaiSabtu: preset.jam_istirahat_mulai_sabtu,
+                              jamIstirahatSelesaiSabtu: preset.jam_istirahat_selesai_sabtu,
                               jamIstirahatMulaiJumat: preset.jam_istirahat_mulai_jumat,
                               jamIstirahatSelesaiJumat: preset.jam_istirahat_selesai_jumat,
                               jamSelesai: preset.jam_selesai,
@@ -962,16 +1115,31 @@ export default function JadwalPage() {
                           }`}
                         >
                           {preset.nama_preset}
+                          {preset.is_default && <span className="ml-2 text-xs">⭐</span>}
                         </button>
-                        {!preset.is_default && (
+                        <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!preset.is_default && (
+                            <button
+                              onClick={() => handleSetAsDefault(preset.id, preset.nama_preset)}
+                              className="bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-yellow-600"
+                              title="Jadikan preset ini default"
+                            >
+                              ★
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeletePreset(preset.id, preset.nama_preset)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold hover:bg-red-600"
-                            title="Hapus preset"
+                            className={`rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold ${
+                              preset.is_default 
+                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                                : 'bg-red-500 text-white hover:bg-red-600'
+                            }`}
+                            title={preset.is_default ? 'Tidak bisa hapus preset default' : 'Hapus preset'}
+                            disabled={preset.is_default}
                           >
                             ×
                           </button>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -995,7 +1163,7 @@ export default function JadwalPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, jamMulai: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
               />
             </div>
 
@@ -1010,7 +1178,7 @@ export default function JadwalPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, durasiSlot: parseInt(e.target.value) })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
                 min="10"
                 max="120"
               />
@@ -1031,7 +1199,7 @@ export default function JadwalPage() {
                       jamIstirahatMulaiSeninKamis: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
                 <span className="flex items-center">-</span>
                 <input
@@ -1043,7 +1211,7 @@ export default function JadwalPage() {
                       jamIstirahatSelesaiSeninKamis: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
               </div>
             </div>
@@ -1063,7 +1231,7 @@ export default function JadwalPage() {
                       jamIstirahatMulaiSabtu: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
                 <span className="flex items-center">-</span>
                 <input
@@ -1075,7 +1243,7 @@ export default function JadwalPage() {
                       jamIstirahatSelesaiSabtu: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
               </div>
             </div>
@@ -1091,7 +1259,7 @@ export default function JadwalPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, jamSelesai: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
               />
             </div>
 
@@ -1111,7 +1279,7 @@ export default function JadwalPage() {
                       jamIstirahatMulaiJumat: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
                 <span className="flex items-center">-</span>
                 <input
@@ -1123,7 +1291,7 @@ export default function JadwalPage() {
                       jamIstirahatSelesaiJumat: e.target.value,
                     })
                   }
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
               </div>
             </div>
@@ -1411,31 +1579,31 @@ export default function JadwalPage() {
       {showSessionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">
+            <h2 className="text-xl font-bold mb-4 text-black">
               {editingSession ? 'Edit Sesi' : 'Tambah Sesi'}
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Hari</label>
+                <label className="block text-sm font-medium mb-2 text-black">Hari</label>
                 <input
                   type="text"
                   value={selectedHari}
                   disabled
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-black"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Ruangan</label>
+                <label className="block text-sm font-medium mb-2 text-black">Ruangan</label>
                 <select
                   value={selectedRuangan}
                   onChange={(e) => setSelectedRuangan(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
                 >
-                  <option value="">Pilih Ruangan</option>
+                  <option value="" className="text-black">Pilih Ruangan</option>
                   {[...ruanganList].sort((a, b) => (a.f_namaruang || '').localeCompare(b.f_namaruang || '')).map((r) => (
-                    <option key={r.id} value={r.id}>
+                    <option key={r.id} value={r.id} className="text-black">
                       {r.f_namaruang}
                     </option>
                   ))}
@@ -1443,9 +1611,9 @@ export default function JadwalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Mode Input</label>
+                <label className="block text-sm font-medium mb-2 text-black">Mode Input</label>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-black">
                     <input
                       type="radio"
                       value="manual"
@@ -1454,7 +1622,7 @@ export default function JadwalPage() {
                     />
                     Manual
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-black">
                     <input
                       type="radio"
                       value="import"
@@ -1467,7 +1635,7 @@ export default function JadwalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Jam Mulai</label>
+                <label className="block text-sm font-medium mb-2 text-black">Jam Mulai</label>
                 <input
                   type="time"
                   value={selectedJamMulai}
@@ -1480,20 +1648,20 @@ export default function JadwalPage() {
                       setCalculatedJamSelesai(calculateJamSelesai(e.target.value, 1));
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Jam Selesai (Otomatis)</label>
+                <label className="block text-sm font-medium mb-2 text-black">Jam Selesai (Otomatis)</label>
                 <input
                   type="time"
                   value={calculatedJamSelesai}
                   disabled
-                  className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg text-black"
                 />
                 {selectedKelas && (
-                  <small className="text-gray-600 text-xs mt-1 block">
+                  <small className="text-black text-xs mt-1 block">
                     📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit
                   </small>
                 )}
@@ -1505,8 +1673,8 @@ export default function JadwalPage() {
                     const breakTimes = getBreakTimes(selectedHari);
                     return (
                       <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm font-medium text-red-800 mb-1">❌ Jadwal Tidak Valid</p>
-                        <p className="text-xs text-red-700">
+                        <p className="text-sm font-medium text-black mb-1">❌ Jadwal Tidak Valid</p>
+                        <p className="text-xs text-black">
                           Kelas dengan <strong>{sks} SKS</strong> tidak boleh terpotong jam istirahat 
                           <br />
                           <strong>{breakTimes.mulai}-{breakTimes.selesai}</strong>
@@ -1519,7 +1687,7 @@ export default function JadwalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-black">
                   {sessionInputMode === 'manual' ? 'Nama Sesi' : 'Pilih Kelas'}
                 </label>
                 {sessionInputMode === 'manual' ? (
@@ -1528,7 +1696,7 @@ export default function JadwalPage() {
                     value={sessionInput}
                     onChange={(e) => setSessionInput(e.target.value)}
                     placeholder="Contoh: Algoritma & Struktur Data"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
                   />
                 ) : (
                   <>
@@ -1546,23 +1714,32 @@ export default function JadwalPage() {
                           setCalculatedJamSelesai(calculateJamSelesai(selectedJamMulai, 1));
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
                     >
-                      <option value="">Pilih Kelas</option>
-                      {kelasList.map((k) => (
-                        <option key={k.id} value={k.id}>
-                          {k.display_name || k.nama_kelas} (SKS: {k.sks || k.f_sks_kurikulum})
-                        </option>
-                      ))}
+                      <option value="" className="text-black">Pilih Kelas</option>
+                      {kelasList.length > 0 ? (
+                        kelasList.map((k) => (
+                          <option key={k.id} value={k.id} className="text-black">
+                            {k.display_name || k.nama_kelas} (SKS: {k.sks || k.f_sks_kurikulum})
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled className="text-gray-500">Tidak ada kelas tersedia</option>
+                      )}
                     </select>
                     
+                    {kelasList.length === 0 && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-black">ℹ️ Tidak ada kelas untuk semester ini. Pastikan sudah memilih tahun akademik dan semester.</p>
+                      </div>
+                    )}
                     {/* Info jika kelas sudah ditambahkan */}
                     {selectedKelas && !editingSession && (() => {
                       const existingSchedule = findExistingKelasSchedule(selectedKelas.id);
                       return existingSchedule.found ? (
                         <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <p className="text-sm font-medium text-yellow-800 mb-1">⚠️ Kelas sudah dijadwalkan</p>
-                          <p className="text-xs text-yellow-700">
+                          <p className="text-sm font-medium text-black mb-1">⚠️ Kelas sudah dijadwalkan</p>
+                          <p className="text-xs text-black">
                             <strong>{existingSchedule.hari}</strong> pukul <strong>{existingSchedule.jamMulai}-{existingSchedule.jamSelesai}</strong>
                             <br />
                             di ruangan <strong>{existingSchedule.ruangan}</strong>
@@ -1573,6 +1750,19 @@ export default function JadwalPage() {
                   </>
                 )}
               </div>
+
+              {/* Warning jika ada overlap dengan jadwal yang sudah ada */}
+              {selectedRuangan && (() => {
+                const overlap = findOverlappingSession(selectedHari, selectedRuangan, selectedJamMulai, calculatedJamSelesai);
+                return overlap.found ? (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm font-medium text-black mb-1">❌ Waktu Bentrok</p>
+                    <p className="text-xs text-black">
+                      Waktu ini sudah dipakai oleh <strong>{overlap.conflictName}</strong> pada pukul <strong>{overlap.conflictTime}</strong>
+                    </p>
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -1582,7 +1772,7 @@ export default function JadwalPage() {
                   setSessionInput('');
                   setEditingSession(null);
                   setSelectedKelas(null);
-                  setSessionInputMode('manual');
+                  setSessionInputMode('import');
                   setSelectedJamMulai(settings.jamMulai);
                   setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1));
                 }}
@@ -1606,7 +1796,10 @@ export default function JadwalPage() {
                       return sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks);
                     })();
                     
-                    return isDuplicate || isCutByBreak;
+                    // Cek overlap dengan jadwal yang sudah ada
+                    const isOverlap = selectedRuangan && findOverlappingSession(selectedHari, selectedRuangan, selectedJamMulai, calculatedJamSelesai).found;
+                    
+                    return isDuplicate || isCutByBreak || isOverlap;
                   })()
                 }
                 className={`flex-1 px-4 py-2 rounded-lg ${
@@ -1623,7 +1816,10 @@ export default function JadwalPage() {
                       return sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks);
                     })();
                     
-                    if (isDuplicate || isCutByBreak) {
+                    // Cek overlap dengan jadwal yang sudah ada
+                    const isOverlap = selectedRuangan && findOverlappingSession(selectedHari, selectedRuangan, selectedJamMulai, calculatedJamSelesai).found;
+                    
+                    if (isDuplicate || isCutByBreak || isOverlap) {
                       return 'bg-gray-400 text-gray-600 cursor-not-allowed';
                     }
                     return 'bg-blue-600 text-white hover:bg-blue-700';
@@ -1643,8 +1839,12 @@ export default function JadwalPage() {
                       return sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks);
                     })();
                     
+                    // Cek overlap dengan jadwal yang sudah ada
+                    const isOverlap = selectedRuangan && findOverlappingSession(selectedHari, selectedRuangan, selectedJamMulai, calculatedJamSelesai).found;
+                    
                     if (isDuplicate) return 'Kelas ini sudah ditambahkan sebelumnya';
                     if (isCutByBreak) return 'Kelas tidak boleh terpotong jam istirahat';
+                    if (isOverlap) return 'Waktu sudah dipakai oleh kelas lain';
                     return '';
                   })()
                 }
