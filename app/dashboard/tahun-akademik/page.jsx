@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
+// ✅ Fix 3: Moved outside main component to prevent unnecessary re-renders
+const SortIndicator = ({ column, sortConfig }) => {
+  if (sortConfig.key !== column) return <span> ⇅</span>;
+  return sortConfig.direction === 'asc' ? <span> ↑</span> : <span> ↓</span>;
+};
+
 export default function TahunAkademikPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,11 +29,21 @@ export default function TahunAkademikPage() {
     try {
       setLoading(true);
       const res = await fetch('/api/tahun-akademik');
+
+      // ✅ Fix 4: Handle non-JSON responses (e.g. HTML error pages)
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server error: invalid response format');
+      }
+
       const json = await res.json();
-      setData(json);
+
+      // ✅ Fix 2: Guard against non-array API responses
+      setData(Array.isArray(json) ? json : []);
       setSelectedIds([]);
     } catch (error) {
-      showMessage('error', 'Gagal memuat data');
+      showMessage('error', 'Gagal memuat data: ' + error.message);
+      setData([]); // ✅ Fix 2: Ensure data is always an array
     } finally {
       setLoading(false);
     }
@@ -59,7 +75,7 @@ export default function TahunAkademikPage() {
     }
 
     const method = form.id ? 'PUT' : 'POST';
-    const url = form.id ? `/api/tahun-akademik` : '/api/tahun-akademik';
+    const url = '/api/tahun-akademik';
 
     try {
       const res = await fetch(url, {
@@ -95,9 +111,9 @@ export default function TahunAkademikPage() {
 
   const handleAddNew = () => {
     resetForm();
-    // Auto-fill the next year based on the last entry
     if (data.length > 0) {
-      const lastYear = data[0].tahun_awal + 1;
+      // ✅ Fix 1: Use Number() to prevent string concatenation (e.g. "20241" instead of 2025)
+      const lastYear = Number(data[0].tahun_awal) + 1;
       setForm({ id: '', tahun_awal: String(lastYear) });
     }
     setShowForm(true);
@@ -155,14 +171,14 @@ export default function TahunAkademikPage() {
   };
 
   const handleSelectAll = (checked) => {
-    setSelectedIds(checked ? data.map(row => row.id) : []);
+    setSelectedIds(checked ? data.map((row) => row.id) : []);
   };
 
   const handleSelectRow = (id, checked) => {
     setSelectedIds(
       checked
         ? [...selectedIds, id]
-        : selectedIds.filter(selectedId => selectedId !== id)
+        : selectedIds.filter((selectedId) => selectedId !== id)
     );
   };
 
@@ -191,19 +207,16 @@ export default function TahunAkademikPage() {
     return sorted;
   };
 
-  const SortIndicator = ({ column }) => {
-    if (sortConfig.key !== column) return <span> ⇅</span>;
-    return sortConfig.direction === 'asc' ? <span> ↑</span> : <span> ↓</span>;
-  };
-
   return (
     <div style={styles.container}>
       {/* Message Alert */}
       {message.text && (
-        <div style={{
-          ...styles.message,
-          ...(message.type === 'error' ? styles.messageError : styles.messageSuccess),
-        }}>
+        <div
+          style={{
+            ...styles.message,
+            ...(message.type === 'error' ? styles.messageError : styles.messageSuccess),
+          }}
+        >
           {message.text}
         </div>
       )}
@@ -251,7 +264,9 @@ export default function TahunAkademikPage() {
                 maxLength="4"
                 style={styles.input}
               />
-              <small style={styles.hint}>Tahun akhir akan otomatis menjadi tahun awal + 1</small>
+              <small style={styles.hint}>
+                Tahun akhir akan otomatis menjadi tahun awal + 1
+              </small>
             </div>
 
             <div style={styles.formActions}>
@@ -290,7 +305,8 @@ export default function TahunAkademikPage() {
                   />
                 </th>
                 <th style={styles.cell} onClick={() => handleSort('tahun_akademik')}>
-                  Tahun Akademik <SortIndicator column="tahun_akademik" />
+                  {/* ✅ Fix 3: Pass sortConfig as prop */}
+                  Tahun Akademik <SortIndicator column="tahun_akademik" sortConfig={sortConfig} />
                 </th>
                 <th style={styles.cell}>Aksi</th>
               </tr>
@@ -307,16 +323,10 @@ export default function TahunAkademikPage() {
                   </td>
                   <td style={styles.cell}>{row.tahun_akademik}</td>
                   <td style={styles.cell}>
-                    <button
-                      onClick={() => handleEdit(row)}
-                      style={styles.btnEdit}
-                    >
+                    <button onClick={() => handleEdit(row)} style={styles.btnEdit}>
                       ✏️ Edit
                     </button>
-                    <button
-                      onClick={() => handleDelete(row.id)}
-                      style={styles.btnDelete}
-                    >
+                    <button onClick={() => handleDelete(row.id)} style={styles.btnDelete}>
                       🗑️ Hapus
                     </button>
                   </td>
