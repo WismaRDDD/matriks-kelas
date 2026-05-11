@@ -2,9 +2,12 @@ import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
 // GET: ambil semua dosen dengan semua field biodata
-export async function GET() {
+export async function GET(req) {
   try {
-    const data = await knex('dosen')
+    const { searchParams } = new URL(req.url);
+    const nidn = searchParams.get('nidn');
+    
+    let query = knex('dosen')
       .select(
         'id',
         'f_nidn',
@@ -18,8 +21,13 @@ export async function GET() {
         'f_progdi_id',
         'created_at',
         'updated_at'
-      )
-      .orderBy('id', 'desc');
+      );
+    
+    if (nidn) {
+      query = query.where('f_nidn', nidn.toString().trim());
+    }
+    
+    const data = await query.orderBy('id', 'desc');
 
     return NextResponse.json(data);
   } catch (err) {

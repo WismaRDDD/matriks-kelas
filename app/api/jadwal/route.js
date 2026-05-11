@@ -6,6 +6,7 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const kurikulumId = searchParams.get('kurikulum_id');
+    const dosenId = searchParams.get('dosen_id');
 
     let query = knex('jadwal')
       .leftJoin('kelas', 'jadwal.kelas_id', 'kelas.id')
@@ -30,12 +31,21 @@ export async function GET(req) {
         'jadwal.sks',
         'jadwal.lantai',
         'jadwal.created_at',
-        'jadwal.updated_at'
+        'jadwal.updated_at',
+        'kelas.nama_kelas',
+        'kurikulum.f_namamk as nama_matakuliah',
+        'dosen.f_namapegawai as nama_dosen_db',
+        'ruangan.f_namaruang as nama_ruangan_db'
       );
 
     // Filter berdasarkan kurikulum_id jika diberikan
     if (kurikulumId) {
       query = query.where('jadwal.kurikulum_id', parseInt(kurikulumId));
+    }
+
+    // Filter berdasarkan dosen_id jika diberikan
+    if (dosenId) {
+      query = query.where('jadwal.dosen_id', parseInt(dosenId));
     }
 
     const data = await query
@@ -109,10 +119,12 @@ export async function POST(req) {
     }
     
     // Cek apakah sudah ada jadwal yang bentrok
+    const jadwalSemester = kurikulumData?.f_semester || kelasData.f_semester;
     const existingJadwal = await knex('jadwal')
       .where({
         hari: body.hari,
-        ruangan_id: parseInt(body.ruangan_id)
+        ruangan_id: parseInt(body.ruangan_id),
+        semester: jadwalSemester
       })
       .select('*');
     
@@ -220,6 +232,7 @@ export async function PUT(req) {
     if (body.jam_mulai) updateData.jam_mulai = body.jam_mulai;
     if (body.jam_selesai) updateData.jam_selesai = body.jam_selesai;
     if (body.dosen_id !== undefined) updateData.dosen_id = body.dosen_id;
+    // Note: semester should come from kurikulum.f_semester, not directly from body
     
     // Jika ada perubahan kelas_id, ambil data kelas terbaru
     if (body.kelas_id && body.kelas_id !== existingJadwal.kelas_id) {
@@ -288,12 +301,14 @@ export async function PUT(req) {
     const ruanganId = updateData.ruangan_id || existingJadwal.ruangan_id;
     const jamMulai = updateData.jam_mulai || existingJadwal.jam_mulai;
     const jamSelesai = updateData.jam_selesai || existingJadwal.jam_selesai;
+    const semester = updateData.semester || existingJadwal.semester;
     
     const existingJadwalList = await knex('jadwal')
       .where('id', '!=', body.id)
       .where({
         hari: hari,
-        ruangan_id: ruanganId
+        ruangan_id: ruanganId,
+        semester: semester
       })
       .select('*');
     

@@ -4,8 +4,16 @@ import { NextResponse } from 'next/server';
 // GET semua preset
 export async function GET(req) {
   try {
-    const presets = await knex('presets')
-      .orderBy('created_at', 'desc');
+    const url = new URL(req.url);
+    const defaultOnly = url.searchParams.get('default');
+
+    let query = knex('presets');
+
+    if (defaultOnly === 'true') {
+      query = query.where({ is_default: true });
+    }
+
+    const presets = await query.orderBy('created_at', 'desc');
     
     return NextResponse.json(presets || []);
   } catch (err) {

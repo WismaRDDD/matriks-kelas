@@ -220,5 +220,3 @@ const styles = {
   accentBlue:   { borderTop: '4px solid #1e88e5' },
   accentAmber:  { borderTop: '4px solid #f57f17' },
 };
-
-export default styles;

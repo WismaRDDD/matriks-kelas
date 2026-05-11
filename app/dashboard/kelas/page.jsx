@@ -1054,6 +1054,7 @@ export default function KelasPage() {
                 borderLeft: '4px solid #38b2ac',
                 borderRadius: '4px',
                 fontSize: '0.9rem',
+                color: '#000000',
               }}>
                 ℹ️ Menampilkan mata kuliah untuk semester <strong>{selectedSemester === 'gasal' ? 'GASAL (1,3,5,7)' : 'GENAP (2,4,6,8)'}</strong>
               </div>
@@ -1475,7 +1476,7 @@ const styles = {
     display: 'block',
     marginBottom: '0.4rem',
     fontWeight: '700',
-    color: '#4a5568',
+    color: '#000000',
     fontSize: '0.78rem',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
@@ -1491,7 +1492,7 @@ const styles = {
     cursor: 'pointer',
     width: '100%',
     transition: 'border-color 0.2s',
-    color: '#37474f',
+    color: '#000000',
     outline: 'none',
   },
 
@@ -1619,6 +1620,7 @@ const styles = {
     borderRadius: '10px',
     marginBottom: '1.5rem',
     borderLeft: '4px solid #7b1fa2',
+    color: '#000000',
   },
   infoBadge: {
     background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
