@@ -9,6 +9,8 @@ export default function DosenPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
+  const [importStats, setImportStats] = useState({ show: false, success: 0, duplicate: 0, failed: 0 });
 
   const [sortConfig, setSortConfig] = useState({
     key: null,
@@ -18,6 +20,7 @@ export default function DosenPage() {
   const [showPreferenceForm, setShowPreferenceForm] = useState(false);
   const [presets, setPresets] = useState([]);
   const [preferences, setPreferences] = useState({});
+  const [floorPreferences, setFloorPreferences] = useState({ 1: true, 2: true, 3: true, 4: true });
 
   const [form, setForm] = useState({
     id: '',
@@ -74,8 +77,15 @@ export default function DosenPage() {
   };
 
   const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    setMessagePopup({ show: true, type, text });
+  };
+
+  const closeMessagePopup = () => {
+    setMessagePopup({ show: false, type: '', text: '' });
+  };
+
+  const closeImportStats = () => {
+    setImportStats({ show: false, success: 0, duplicate: 0, failed: 0 });
   };
 
   // Form Handlers
@@ -220,44 +230,54 @@ export default function DosenPage() {
               newPreferences[pref.hari][pref.sesi] = pref.is_available;
             }
           });
+          
+          // Load floor preferences if exists
+          const dosenWithFloors = existingPrefs[0]?.dosen_prefer_lantai;
+          if (dosenWithFloors) {
+            const floorsArray = dosenWithFloors.split(',').map(f => parseInt(f.trim()));
+            setFloorPreferences({ 1: floorsArray.includes(1), 2: floorsArray.includes(2), 3: floorsArray.includes(3), 4: floorsArray.includes(4) });
+          } else {
+            setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+          }
+        } else {
+          setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
         }
       }
     } catch (err) {
       console.error('Error loading preferences:', err);
+      setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
     }
 
     setPreferences(newPreferences);
     setShowPreferenceForm(true);
   };
 
-  const handleSelectAllSessionsForDay = (day) => {
+  const handleSelectAllSessionsForDay = (day, sessions) => {
     setPreferences((prev) => {
       const updated = { ...prev };
       if (!updated[day]) updated[day] = {};
-      const sessionsInDay = Object.keys(updated[day]);
       
-      // Check if all sessions for this day are checked
-      const allSessionsChecked = sessionsInDay.length > 0 && sessionsInDay.every((s) => updated[day][s]);
+      // Check if ALL sessions for this day are checked
+      const allSessionsChecked = sessions.length > 0 && sessions.every((session) => updated[day]?.[session]);
       
-      // Toggle: if all checked, uncheck all; otherwise check all
-      const newValue = !allSessionsChecked;
-      sessionsInDay.forEach((session) => {
+      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
+      const newValue = allSessionsChecked ? false : true;
+      sessions.forEach((session) => {
         updated[day][session] = newValue;
       });
       return updated;
     });
   };
 
-  const handleSelectAllDaysForSession = (session) => {
+  const handleSelectAllDaysForSession = (session, days) => {
     setPreferences((prev) => {
       const updated = { ...prev };
-      const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       
-      // Check if all days for this session are checked
+      // Check if ALL days for this session are checked
       const allDaysChecked = days.every((day) => updated[day]?.[session]);
       
-      // Toggle: if all checked, uncheck all; otherwise check all
-      const newValue = !allDaysChecked;
+      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
+      const newValue = allDaysChecked ? false : true;
       days.forEach((day) => {
         if (!updated[day]) updated[day] = {};
         updated[day][session] = newValue;
@@ -281,11 +301,14 @@ export default function DosenPage() {
         });
       });
       
-      // Toggle: if all checked, uncheck all; otherwise check all
+      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
       const allChecked = totalItems > 0 && checkedItems === totalItems;
-      const newValue = !allChecked;
+      const newValue = allChecked ? false : true;
       days.forEach((day) => {
-        Object.keys(updated[day] || {}).forEach((session) => {
+        if (!updated[day]) updated[day] = {};
+        // Get all sessions for this day
+        const sessions = Object.keys(updated[day]);
+        sessions.forEach((session) => {
           updated[day][session] = newValue;
         });
       });
@@ -355,12 +378,17 @@ export default function DosenPage() {
 
   const handleSavePreference = async () => {
     try {
+      const preferredFloors = Object.keys(floorPreferences)
+        .filter(floor => floorPreferences[floor])
+        .join(',');
+      
       const res = await fetch('/api/dosen/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dosenId: form.id,
           preferences,
+          preferredFloors: preferredFloors || '1,2,3,4',
         }),
       });
 
@@ -425,24 +453,20 @@ export default function DosenPage() {
         throw new Error(result.error || 'Import gagal');
       }
 
+      // Tampilkan statistik import
       const summary = result.summary || result;
-      const errorList = result.errors ? result.errors.slice(0, 5).join('\n') : '';
-      
-      let message = `✅ Import selesai: ${summary.success} sukses, ${summary.failed} gagal, ${summary.duplicated || 0} duplikat`;
-      if (errorList) {
-        message += `\n\n⚠️ Beberapa error:\n${errorList}`;
-        if (result.errors.length > 5) {
-          message += `\n... dan ${result.errors.length - 5} error lainnya`;
-        }
-      }
-      
-      showMessage('success', message);
+      setImportStats({
+        show: true,
+        success: summary.success || 0,
+        duplicate: summary.duplicated || summary.duplicate || 0,
+        failed: summary.failed || 0,
+      });
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
       fetchData();
     } catch (error) {
-      showMessage('error', `❌ ${error.message}`);
+      showMessage('error', error.message);
     } finally {
       setUploading(false);
     }
@@ -600,12 +624,7 @@ export default function DosenPage() {
       <div style={styles.card}>
         <h1 style={styles.title}>👨‍🏫 Dashboard Dosen</h1>
 
-        {/* Message Display */}
-        {message.text && (
-          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
-          </div>
-        )}
+        {/* Message Display - REMOVED, replaced with modal */}
 
         {/* Toolbar */}
         <div style={styles.toolbar}>
@@ -614,7 +633,7 @@ export default function DosenPage() {
               ➕ Tambah Dosen
             </button>
             <button style={styles.btnSuccess} onClick={downloadTemplate}>
-              📥 Template Excel
+              📥 Download Template
             </button>
             <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
               📂 Import Excel
@@ -643,7 +662,7 @@ export default function DosenPage() {
         {/* Table Section */}
         <div style={styles.tableWrapper}>
           <div style={styles.tableHeader}>
-            <h2>📋 Daftar Dosen</h2>
+            <h2 style={styles.tableTitle}>📋 Daftar Dosen</h2>
             <span style={styles.badge}>Total: {data.length} dosen</span>
           </div>
 
@@ -741,6 +760,56 @@ export default function DosenPage() {
           )}
         </div>
       </div>
+
+      {/* Modal Pesan Popup */}
+      {messagePopup.show && (
+        <div style={styles.modal} onClick={closeMessagePopup}>
+          <div
+            style={{
+              ...styles.modalContentSmall,
+              ...(messagePopup.type === 'success' ? styles.popupSuccess : styles.popupError),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={styles.popupIcon}>
+              {messagePopup.type === 'success' ? '✅' : '❌'}
+            </div>
+            <p style={styles.popupText}>{messagePopup.text}</p>
+            <button style={styles.btnClose} onClick={closeMessagePopup}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Import Stats */}
+      {importStats.show && (
+        <div style={styles.modal} onClick={closeImportStats}>
+          <div
+            style={styles.modalContentSmall}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={styles.popupTitle}>📊 Hasil Import</h3>
+            <div style={styles.statsContainer}>
+              <div style={{ ...styles.statBox, ...styles.statSuccess }}>
+                <div style={styles.statNumber}>{importStats.success}</div>
+                <div style={styles.statLabel}>Berhasil</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statWarning }}>
+                <div style={styles.statNumber}>{importStats.duplicate}</div>
+                <div style={styles.statLabel}>Duplikat</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statError }}>
+                <div style={styles.statNumber}>{importStats.failed}</div>
+                <div style={styles.statLabel}>Gagal</div>
+              </div>
+            </div>
+            <button style={styles.btnClose} onClick={closeImportStats}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Form */}
       {showForm && (
@@ -895,6 +964,24 @@ export default function DosenPage() {
                   </span>
                 </div>
 
+                {/* Floor Preferences Section */}
+                <div style={{...styles.presetInfo, marginTop: '1rem'}}>
+                  <strong>🏢 Preferensi Lantai:</strong>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                    {[1, 2, 3, 4].map((floor) => (
+                      <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#37474f', fontWeight: '500' }}>
+                        <input
+                          type="checkbox"
+                          checked={floorPreferences[floor] || false}
+                          onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#7b1fa2' }}
+                        />
+                        Lantai {floor}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 <div style={styles.preferenceGrid}>
                   <table style={styles.preferenceTable}>
                     <thead>
@@ -928,7 +1015,7 @@ export default function DosenPage() {
                                     const checkedCount = days.filter((day) => preferences[day]?.[session]).length;
                                     return dayCount > 0 && checkedCount === dayCount;
                                   })()}
-                                  onChange={() => handleSelectAllDaysForSession(session)}
+                                  onChange={() => handleSelectAllDaysForSession(session, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'])}
                                   style={styles.checkboxSmall}
                                   title={`Pilih semua hari untuk ${session}`}
                                 />
@@ -941,15 +1028,14 @@ export default function DosenPage() {
                     <tbody>
                       {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
                         const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], day);
-                        const sessionsInDay = Object.keys(preferences[day] || {});
-                        const allSessionsChecked = sessionsInDay.length > 0 && sessionsInDay.every((session) => preferences[day][session]);
+                        const allSessionsChecked = sessions.length > 0 && sessions.every((session) => preferences[day]?.[session]);
                         return (
                           <tr key={day}>
                             <td style={styles.preferenceCell}>
                               <input
                                 type="checkbox"
                                 checked={allSessionsChecked}
-                                onChange={() => handleSelectAllSessionsForDay(day)}
+                                onChange={() => handleSelectAllSessionsForDay(day, sessions)}
                                 style={styles.checkbox}
                                 title={`Pilih semua sesi untuk ${day}`}
                               />
@@ -1039,7 +1125,7 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     margin: 0,
     letterSpacing: '0.02em',
   },
@@ -1411,7 +1497,7 @@ const styles = {
   modalTitle: {
     fontSize: '1.2rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     margin: 0,
   },
   modalCloseBtn: {
@@ -1558,5 +1644,89 @@ const styles = {
     width: '16px',
     height: '16px',
     accentColor: '#7b1fa2',
+  },
+
+  // ── Popup Modal ────────────────────────────────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '14px',
+    minWidth: '350px',
+    maxWidth: '85vw',
+    padding: '2rem',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    textAlign: 'center',
+  },
+  popupIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  popupText: {
+    color: '#000000',
+    fontSize: '1rem',
+    fontWeight: '500',
+    marginBottom: '1.5rem',
+    lineHeight: '1.5',
+  },
+  popupTitle: {
+    color: '#000000',
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    marginBottom: '1.5rem',
+    margin: 0,
+  },
+  popupSuccess: {
+    backgroundColor: '#e8f5e9',
+    borderLeft: '4px solid #4caf50',
+  },
+  popupError: {
+    backgroundColor: '#fce4ec',
+    borderLeft: '4px solid #e53935',
+  },
+  btnClose: {
+    padding: '0.6rem 1.5rem',
+    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(123,31,162,0.3)',
+    transition: 'opacity 0.2s',
+  },
+
+  // ── Import Stats ───────────────────────────────────────────
+  statsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+  },
+  statBox: {
+    padding: '1.5rem 1rem',
+    borderRadius: '10px',
+    textAlign: 'center',
+  },
+  statSuccess: {
+    backgroundColor: '#e8f5e9',
+  },
+  statWarning: {
+    backgroundColor: '#fff3e0',
+  },
+  statError: {
+    backgroundColor: '#fce4ec',
+  },
+  statNumber: {
+    fontSize: '2rem',
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: '0.5rem',
+  },
+  statLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
   },
 };

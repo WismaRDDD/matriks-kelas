@@ -36,6 +36,15 @@ export async function POST(req) {
       // Bulk copy dari array jadwal IDs
       const jadwalIds = body;
       
+      // Handle empty array - still allow creation but with 0 copies
+      if (jadwalIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: '0 jadwal copy telah dibuat',
+          count: 0,
+        });
+      }
+      
       // Delete existing copies untuk jadwal-jadwal ini
       await knex('jadwal_copy')
         .whereIn('jadwal_id', jadwalIds)
@@ -67,7 +76,9 @@ export async function POST(req) {
         learning_time: null,
       }));
 
-      await knex('jadwal_copy').insert(copies);
+      if (copies.length > 0) {
+        await knex('jadwal_copy').insert(copies);
+      }
 
       return NextResponse.json({
         success: true,

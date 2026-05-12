@@ -16,6 +16,8 @@ export default function KurikulumPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
+  const [importStats, setImportStats] = useState({ show: false, success: 0, duplicate: 0, failed: 0 });
   const [showForm, setShowForm] = useState(false);
   const [showMatkulForm, setShowMatkulForm] = useState(false);
   const [form, setForm] = useState({
@@ -122,8 +124,15 @@ export default function KurikulumPage() {
   }, [selectedKurikulum]);
 
   const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    setMessagePopup({ show: true, type, text });
+  };
+
+  const closeMessagePopup = () => {
+    setMessagePopup({ show: false, type: '', text: '' });
+  };
+
+  const closeImportStats = () => {
+    setImportStats({ show: false, success: 0, duplicate: 0, failed: 0 });
   };
 
   // ================= TAMBAH KURIKULUM =================
@@ -236,9 +245,16 @@ export default function KurikulumPage() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Import gagal');
+      const result = await safeJson(res);
+      if (!res.ok) throw new Error(result.error || 'Import gagal');
 
-      showMessage('success', 'Import berhasil');
+      // Tampilkan statistik import
+      setImportStats({
+        show: true,
+        success: result.success || 0,
+        duplicate: result.duplicate || 0,
+        failed: result.failed || 0,
+      });
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
@@ -280,8 +296,14 @@ export default function KurikulumPage() {
     if (!confirm(`Hapus "${nama}"?`)) return;
 
     try {
-      const res = await fetch(`/api/kurikulum/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Gagal hapus');
+      const res = await fetch('/api/kurikulum/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+
+      const result = await safeJson(res);
+      if (!res.ok) throw new Error(result.error || 'Gagal hapus');
 
       showMessage('success', 'Mata kuliah berhasil dihapus');
       fetchMatkul(selectedKurikulum);
@@ -340,17 +362,7 @@ export default function KurikulumPage() {
       <div style={styles.card}>
         <h1 style={styles.title}>📚 Dashboard Kurikulum</h1>
 
-        {/* Message Display */}
-        {message.text && (
-          <div
-            style={{
-              ...styles.message,
-              ...(message.type === 'success' ? styles.messageSuccess : styles.messageError),
-            }}
-          >
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
-          </div>
-        )}
+        {/* Message Display - REMOVED, replaced with modal */}
 
         {/* Master Filter: Tahun Akademik */}
         <div style={styles.masterFilter}>
@@ -369,6 +381,14 @@ export default function KurikulumPage() {
           </select>
         </div>
 
+        <div style={styles.toolbar}>
+          <div style={styles.toolbarLeft}>
+            <button style={styles.btnPrimary} onClick={() => setShowForm(true)}>
+              ➕ Tambah Kurikulum
+            </button>
+          </div>
+        </div>
+        
         {/* Subfilters: Kode Kurikulum & Tahun Ajaran */}
         {selectedTahunAkademik && (
           <div style={styles.subFilters}>
@@ -411,9 +431,6 @@ export default function KurikulumPage() {
         {/* Toolbar */}
         <div style={styles.toolbar}>
           <div style={styles.toolbarLeft}>
-            <button style={styles.btnPrimary} onClick={() => setShowForm(true)}>
-              ➕ Tambah Kurikulum
-            </button>
             <button
               style={selectedKurikulum ? styles.btnPrimary : styles.btnDisabled}
               disabled={!selectedKurikulum}
@@ -515,7 +532,9 @@ export default function KurikulumPage() {
                     <th style={styles.th} onClick={() => handleSort('f_semester')}>
                       Semester {renderSortIcon('f_semester')}
                     </th>
-                    <th style={styles.th}>Kelompok</th>
+                    <th style={styles.th} onClick={() => handleSort('f_namakelompok')}>
+                      Kelompok {renderSortIcon('f_namakelompok')}
+                    </th>
                     <th style={styles.thAksi}>Aksi</th>
                   </tr>
                 </thead>
@@ -561,6 +580,56 @@ export default function KurikulumPage() {
           )}
         </div>
       </div>
+
+      {/* Modal Pesan Popup */}
+      {messagePopup.show && (
+        <div style={styles.modal} onClick={closeMessagePopup}>
+          <div
+            style={{
+              ...styles.modalContentSmall,
+              ...(messagePopup.type === 'success' ? styles.popupSuccess : styles.popupError),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={styles.popupIcon}>
+              {messagePopup.type === 'success' ? '✅' : '❌'}
+            </div>
+            <p style={styles.popupText}>{messagePopup.text}</p>
+            <button style={styles.btnClose} onClick={closeMessagePopup}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Import Stats */}
+      {importStats.show && (
+        <div style={styles.modal} onClick={closeImportStats}>
+          <div
+            style={styles.modalContentSmall}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={styles.popupTitle}>📊 Hasil Import</h3>
+            <div style={styles.statsContainer}>
+              <div style={{ ...styles.statBox, ...styles.statSuccess }}>
+                <div style={styles.statNumber}>{importStats.success}</div>
+                <div style={styles.statLabel}>Berhasil</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statWarning }}>
+                <div style={styles.statNumber}>{importStats.duplicate}</div>
+                <div style={styles.statLabel}>Duplikat</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statError }}>
+                <div style={styles.statNumber}>{importStats.failed}</div>
+                <div style={styles.statLabel}>Gagal</div>
+              </div>
+            </div>
+            <button style={styles.btnClose} onClick={closeImportStats}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Tambah Kurikulum */}
       {showForm && (
@@ -729,7 +798,7 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     margin: 0,
     letterSpacing: '0.02em',
   },
@@ -1202,5 +1271,89 @@ const styles = {
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem',
     marginBottom: '1rem',
+  },
+
+  // ── Popup Modal ────────────────────────────────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '14px',
+    minWidth: '350px',
+    maxWidth: '85vw',
+    padding: '2rem',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    textAlign: 'center',
+  },
+  popupIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  popupText: {
+    color: '#000000',
+    fontSize: '1rem',
+    fontWeight: '500',
+    marginBottom: '1.5rem',
+    lineHeight: '1.5',
+  },
+  popupTitle: {
+    color: '#000000',
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    marginBottom: '1.5rem',
+    margin: 0,
+  },
+  popupSuccess: {
+    backgroundColor: '#e8f5e9',
+    borderLeft: '4px solid #4caf50',
+  },
+  popupError: {
+    backgroundColor: '#fce4ec',
+    borderLeft: '4px solid #e53935',
+  },
+  btnClose: {
+    padding: '0.6rem 1.5rem',
+    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(123,31,162,0.3)',
+    transition: 'opacity 0.2s',
+  },
+
+  // ── Import Stats ───────────────────────────────────────────
+  statsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+  },
+  statBox: {
+    padding: '1.5rem 1rem',
+    borderRadius: '10px',
+    textAlign: 'center',
+  },
+  statSuccess: {
+    backgroundColor: '#e8f5e9',
+  },
+  statWarning: {
+    backgroundColor: '#fff3e0',
+  },
+  statError: {
+    backgroundColor: '#fce4ec',
+  },
+  statNumber: {
+    fontSize: '2rem',
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: '0.5rem',
+  },
+  statLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
   },
 };

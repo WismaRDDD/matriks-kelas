@@ -241,7 +241,7 @@ export default function TahunAkademikPage() {
         <div style={styles.modal}>
           <div style={styles.modalContent}>
             <div style={styles.formHeader}>
-              <h3>{editingId ? 'Edit Tahun Akademik' : 'Tambah Tahun Akademik'}</h3>
+              <h3 style={styles.formTitle}>{editingId ? 'Edit Tahun Akademik' : 'Tambah Tahun Akademik'}</h3>
               <button
                 onClick={() => {
                   setShowForm(false);
@@ -423,6 +423,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '1.5rem',
+  },
+  formTitle: {
+    color: '#000000',
+    margin: 0,
   },
   closeBtn: {
     background: 'none',

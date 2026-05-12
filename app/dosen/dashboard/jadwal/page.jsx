@@ -14,6 +14,9 @@ export default function DosenJadwalPage() {
   const [tahunAkademik, setTahunAkademik] = useState(null);
   const [selectedSemester, setSelectedSemester] = useState('Gasal');
   const [preset, setPreset] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
@@ -29,6 +32,25 @@ export default function DosenJadwalPage() {
     if (!timeStr) return 0;
     const [h, m] = timeStr.split(':').map(Number);
     return h * 60 + m;
+  };
+
+  // Function untuk refresh jadwal data
+  const refreshJadwalData = async (dosenIdParam) => {
+    if (!dosenIdParam) return;
+    
+    try {
+      setIsRefreshing(true);
+      const jadwalCopyRes = await fetch(`/api/jadwal-copy?dosen_id=${dosenIdParam}`);
+      if (jadwalCopyRes.ok) {
+        const jadwalCopyData = await jadwalCopyRes.json();
+        setJadwalCopy(Array.isArray(jadwalCopyData) ? jadwalCopyData : []);
+        setLastSyncTime(new Date());
+      }
+    } catch (err) {
+      console.error('Error refreshing jadwal:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Generate time slots based on preset
@@ -123,6 +145,7 @@ export default function DosenJadwalPage() {
           if (jadwalCopyRes.ok) {
             const jadwalCopyData = await jadwalCopyRes.json();
             setJadwalCopy(Array.isArray(jadwalCopyData) ? jadwalCopyData : []);
+            setLastSyncTime(new Date());
           }
         }
       } catch (err) {
@@ -135,6 +158,17 @@ export default function DosenJadwalPage() {
 
     fetchData();
   }, [router]);
+
+  // Setup auto-refresh interval (polling)
+  useEffect(() => {
+    if (!autoRefreshEnabled || !dosenId) return;
+
+    const interval = setInterval(() => {
+      refreshJadwalData(dosenId);
+    }, 30000); // Refresh setiap 30 detik
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, dosenId]);
 
   if (loading) {
     return (
@@ -210,7 +244,7 @@ export default function DosenJadwalPage() {
         <h2 style={s.title}>📅 Jadwal Kuliah</h2>
 
         {/* Info Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <label style={{ display: 'block', fontWeight: 600, fontSize: '0.75rem', color: '#4a5568', textTransform: 'uppercase', marginBottom: '0.4rem' }}>📅 Tahun Akademik</label>
             <div style={{ padding: '0.65rem 0.9rem', background: '#f5f5f5', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '0.9rem', color: '#37474f', fontWeight: '500' }}>
@@ -226,6 +260,55 @@ export default function DosenJadwalPage() {
               <option value="Gasal">Gasal (1,3,5,7,9)</option>
               <option value="Genap">Genap (2,4,6,8,10)</option>
             </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '0.75rem', color: '#4a5568', textTransform: 'uppercase', marginBottom: '0.4rem' }}>🔄 Sinkronisasi</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => refreshJadwalData(dosenId)}
+                disabled={isRefreshing}
+                style={{
+                  flex: 1,
+                  padding: '0.65rem 0.9rem',
+                  background: isRefreshing ? '#ccc' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                {isRefreshing ? '⏳ Refresh...' : '🔄 Refresh'}
+              </button>
+              <button
+                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                style={{
+                  padding: '0.65rem 0.9rem',
+                  background: autoRefreshEnabled ? '#4caf50' : '#999',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  minWidth: '60px',
+                  transition: 'all 0.3s'
+                }}
+                title={autoRefreshEnabled ? 'Auto-refresh aktif (30 detik)' : 'Auto-refresh nonaktif'}
+              >
+                {autoRefreshEnabled ? '✓ Auto' : '✕ Manual'}
+              </button>
+            </div>
+            {lastSyncTime && (
+              <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.5rem', textAlign: 'center' }}>
+                Sinkron: {lastSyncTime.toLocaleTimeString('id-ID')}
+              </div>
+            )}
           </div>
         </div>
 

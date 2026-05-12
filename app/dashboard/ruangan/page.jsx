@@ -8,7 +8,8 @@ export default function RuanganPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
+  const [importStats, setImportStats] = useState({ show: false, success: 0, duplicate: 0, failed: 0 });
 
   const [sortConfig, setSortConfig] = useState({
     key: null,
@@ -59,8 +60,15 @@ export default function RuanganPage() {
   }, []);
 
   const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    setMessagePopup({ show: true, type, text });
+  };
+
+  const closeMessagePopup = () => {
+    setMessagePopup({ show: false, type: '', text: '' });
+  };
+
+  const closeImportStats = () => {
+    setImportStats({ show: false, success: 0, duplicate: 0, failed: 0 });
   };
 
   // Form Handlers
@@ -179,12 +187,12 @@ export default function RuanganPage() {
 
       const result = await safeJson(res);
 
-      let messageText = '📊 Hasil Import:\n';
-      if (result.success) messageText += `✅ Sukses: ${result.success}\n`;
-      if (result.duplicate) messageText += `⚠️ Duplikat: ${result.duplicate}\n`;
-      if (result.failed) messageText += `❌ Gagal: ${result.failed}`;
-
-      showMessage('success', messageText);
+      setImportStats({
+        show: true,
+        success: result.success || 0,
+        duplicate: result.duplicate || 0,
+        failed: result.failed || 0,
+      });
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
@@ -244,8 +252,10 @@ export default function RuanganPage() {
     if (!confirm(`Hapus ruangan "${nama}"?`)) return;
 
     try {
-      const res = await fetch(`/api/ruangan/${id}`, {
-        method: 'DELETE',
+      const res = await fetch('/api/ruangan/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
       });
 
       if (!res.ok) throw new Error('Gagal menghapus data');
@@ -296,14 +306,37 @@ export default function RuanganPage() {
         <h1 style={styles.title}>🏢 Dashboard Ruangan</h1>
 
         {/* Message Display */}
-        {message.text && (
-          <div
-            style={{
-              ...styles.message,
-              ...(message.type === 'success' ? styles.messageSuccess : styles.messageError),
-            }}
-          >
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+        {messagePopup.show && (
+          <div style={styles.modal} onClick={closeMessagePopup}>
+            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
+              <h2 style={styles.popupTitle}>{messagePopup.type === 'success' ? '✅' : '❌'}</h2>
+              <p style={styles.popupText}>{messagePopup.text}</p>
+              <button style={styles.btnClose} onClick={closeMessagePopup}>Tutup</button>
+            </div>
+          </div>
+        )}
+
+        {/* Import Stats Modal */}
+        {importStats.show && (
+          <div style={styles.modal} onClick={closeImportStats}>
+            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
+              <h2 style={styles.popupTitle}>📊 Hasil Import</h2>
+              <div style={styles.statsContainer}>
+                <div style={styles.statBox}>
+                  <div style={styles.statNumber}>{importStats.success}</div>
+                  <div style={styles.statLabel}>Sukses</div>
+                </div>
+                <div style={styles.statBox}>
+                  <div style={styles.statNumber}>{importStats.duplicate}</div>
+                  <div style={styles.statLabel}>Duplikat</div>
+                </div>
+                <div style={styles.statBox}>
+                  <div style={styles.statNumber}>{importStats.failed}</div>
+                  <div style={styles.statLabel}>Gagal</div>
+                </div>
+              </div>
+              <button style={styles.btnClose} onClick={closeImportStats}>Tutup</button>
+            </div>
           </div>
         )}
 
@@ -356,7 +389,7 @@ export default function RuanganPage() {
         {/* Table Section */}
         <div style={styles.tableWrapper}>
           <div style={styles.tableHeader}>
-            <h2>📋 Daftar Ruangan</h2>
+            <h2 style={styles.tableTitle}>📋 Daftar Ruangan</h2>
             <span style={styles.badge}>Total: {data.length} ruangan</span>
           </div>
 
@@ -583,7 +616,7 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     margin: 0,
     letterSpacing: '0.02em',
   },
@@ -723,6 +756,12 @@ const styles = {
     alignItems: 'center',
     marginBottom: '0.75rem',
     padding: '0 0.25rem',
+  },
+    tableTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#37474f',
+    margin: 0,
   },
   badge: {
     backgroundColor: '#ede7f6',
@@ -882,6 +921,68 @@ const styles = {
     borderRadius: '6px',
     transition: 'background 0.2s',
     color: '#b71c1c',
+  },
+
+  // ── Popup modal styling ───────────────────────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '14px',
+    width: '360px',
+    maxWidth: '90vw',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    overflow: 'hidden',
+    padding: '2rem',
+    textAlign: 'center',
+  },
+  popupTitle: {
+    fontSize: '2.5rem',
+    margin: '0 0 1rem 0',
+    lineHeight: 1,
+  },
+  popupText: {
+    fontSize: '0.95rem',
+    color: '#37474f',
+    margin: '0 0 1.5rem 0',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-line',
+  },
+  statsContainer: {
+    display: 'flex',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+    justifyContent: 'center',
+  },
+  statBox: {
+    flex: '1',
+    minWidth: '80px',
+    padding: '1rem',
+    backgroundColor: '#f5f5f5',
+    borderRadius: '10px',
+    border: '1px solid #e0e0e0',
+  },
+  statNumber: {
+    fontSize: '1.8rem',
+    fontWeight: '700',
+    color: '#1565c0',
+    marginBottom: '0.3rem',
+  },
+  statLabel: {
+    fontSize: '0.75rem',
+    color: '#666',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  btnClose: {
+    padding: '0.6rem 1.5rem',
+    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s',
   },
 
   // ── Modal overlay ─────────────────────────────────────────

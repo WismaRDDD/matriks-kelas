@@ -17,11 +17,23 @@ export async function GET(req) {
     const preferences = await knex('dosen_preferences')
       .where({ dosen_id: dosenId });
 
+    // Get dosen's floor preferences
+    const dosen = await knex('dosen')
+      .where({ id: dosenId })
+      .select('prefer_lantai')
+      .first();
+
     if (preferences.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json([{ dosen_prefer_lantai: dosen?.prefer_lantai || '1,2,3,4' }]);
     }
 
-    return NextResponse.json(preferences);
+    // Add dosen's floor preferences to each preference record
+    const preferencesWithFloors = preferences.map(pref => ({
+      ...pref,
+      dosen_prefer_lantai: dosen?.prefer_lantai || '1,2,3,4'
+    }));
+
+    return NextResponse.json(preferencesWithFloors);
   } catch (err) {
     console.error('❌ Get preferences error:', err);
     return NextResponse.json(
@@ -34,7 +46,7 @@ export async function GET(req) {
 // POST: Save preferences for a dosen
 export async function POST(req) {
   try {
-    const { dosenId, preferences } = await req.json();
+    const { dosenId, preferences, preferredFloors } = await req.json();
 
     if (!dosenId || !preferences) {
       return NextResponse.json(
@@ -61,6 +73,13 @@ export async function POST(req) {
 
     if (preferencesData.length > 0) {
       await knex('dosen_preferences').insert(preferencesData);
+    }
+
+    // Save floor preferences to dosen table if provided
+    if (preferredFloors) {
+      await knex('dosen').where({ id: dosenId }).update({
+        prefer_lantai: preferredFloors,
+      });
     }
 
     return NextResponse.json({

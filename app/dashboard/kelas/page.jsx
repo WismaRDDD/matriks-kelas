@@ -9,7 +9,7 @@ export default function KelasPage() {
   const [kelasList, setKelasList] = useState([]);
   const [dosenList, setDosenList] = useState([]);
   const [kelasBaru, setKelasBaru] = useState([]);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
   const [activeTab, setActiveTab] = useState('view');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [searchMatkul, setSearchMatkul] = useState('');
@@ -19,8 +19,6 @@ export default function KelasPage() {
   const [editingKelas, setEditingKelas] = useState(null);
   const [editingDosenSearch, setEditingDosenSearch] = useState('');
   const [showDosenDropdown, setShowDosenDropdown] = useState(false);
-  const [addingForGroup, setAddingForGroup] = useState(null);
-  const [newClassData, setNewClassData] = useState({ nama_kelas: '', dosen: '' });
   const [searchKeywordView, setSearchKeywordView] = useState('');
   
   // Filter states
@@ -117,8 +115,11 @@ export default function KelasPage() {
   }, []);
 
   const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    setMessagePopup({ show: true, type, text });
+  };
+
+  const closeMessagePopup = () => {
+    setMessagePopup({ show: false, type: '', text: '' });
   };
 
   // HANDLER
@@ -151,14 +152,29 @@ export default function KelasPage() {
 
   const getNextClassName = () => {
     if (kelasList.length === 0) return 'A';
-    const maxCode = Math.max(...kelasList.map(k => k.nama.charCodeAt(0)), 64);
-    const nextCode = maxCode + 1;
-    return nextCode > 90 ? 'Z' : String.fromCharCode(nextCode);
+    
+    // Get all existing class codes
+    const existingCodes = new Set(kelasList.map(k => k.nama.charCodeAt(0)));
+    
+    // Find first gap starting from 'A' (65)
+    for (let code = 65; code <= 90; code++) { // A to Z
+      if (!existingCodes.has(code)) {
+        return String.fromCharCode(code);
+      }
+    }
+    
+    // If all A-Z are taken, return 'Z'
+    return 'Z';
   };
 
   const tambahKelas = () => {
     const nextName = getNextClassName();
-    setKelasList([...kelasList, { nama: nextName, dosen: '', isExisting: false }]);
+    setKelasList([...kelasList, { 
+      tempId: `${Date.now()}-${Math.random()}`,
+      nama: nextName, 
+      dosen: '', 
+      isExisting: false 
+    }]);
   };
 
   const hapusKelas = (index) => {
@@ -216,7 +232,10 @@ export default function KelasPage() {
     }
 
     try {
-      const newClasses = kelasList.filter(k => !k.isExisting);
+      const newClasses = kelasList.filter(k => !k.isExisting).map(k => ({
+        nama: k.nama,
+        dosen: k.dosen,
+      }));
       const existingClasses = kelasList.filter(k => k.isExisting);
 
       // POST kelas baru
@@ -284,24 +303,11 @@ export default function KelasPage() {
     }
   };
 
-  const handleEditKelas = async (kelas) => {
-    setEditingKelas({ ...kelas });
+  const handleEditKelas = (kelas) => {
+    // Detail-only mode (read-only)
+    setEditingKelas({ ...kelas, isDetailOnly: true });
     setEditingDosenSearch('');
     setShowDosenDropdown(false);
-    
-    // Fetch dosen list untuk dropdown search
-    if (dosenList.length === 0) {
-      try {
-        // Get prodi name dari kelas
-        const prodiName = prodi.find(p => p.id === kelas.f_kurikulum)?.nama_kurikulum;
-        if (prodiName) {
-          await fetchDosen(prodiName);
-        }
-      } catch (err) {
-        console.error('Error fetch dosen:', err);
-      }
-    }
-    
     setShowEditModal(true);
   };
 
@@ -337,36 +343,6 @@ export default function KelasPage() {
       setEditingKelas(null);
       setEditingDosenSearch('');
       setShowDosenDropdown(false);
-    } catch (err) {
-      showMessage('error', err.message);
-    }
-  };
-
-  const handleAddClassToGroup = async (groupData) => {
-    if (!newClassData.nama_kelas.trim()) {
-      showMessage('error', 'Nama kelas tidak boleh kosong');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/kelas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          f_kurikulum: groupData.f_kurikulum,
-          f_matkul_id: groupData.f_matkul_id,
-          kelasList: [{
-            nama: newClassData.nama_kelas,
-            dosen: newClassData.dosen || null,
-          }],
-        }),
-      });
-
-      if (!res.ok) throw new Error('Gagal tambah kelas');
-      showMessage('success', 'Kelas berhasil ditambahkan');
-      await fetchKelasBaru();
-      setAddingForGroup(null);
-      setNewClassData({ nama_kelas: '', dosen: '' });
     } catch (err) {
       showMessage('error', err.message);
     }
@@ -475,10 +451,11 @@ export default function KelasPage() {
     const filteredData = getFilteredDataByMasterFilters();
   
     filteredData.forEach(k => {
-      const key = `${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
+      const key = `${k.f_matkul_id}||${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
       if (!grouped[key]) {
         grouped[key] = {
           f_kurikulum: k.f_kurikulum,
+          f_matkul_id: k.f_matkul_id,
           f_kodemk: k.f_kodemk,
           f_namamk: k.f_namamk,
           f_sks_kurikulum: k.f_sks_kurikulum || '-',
@@ -545,13 +522,14 @@ export default function KelasPage() {
       });
     }
 
-    // Group filtered data
+    // Group filtered data - include f_matkul_id to ensure separate mata kuliah are not grouped together
     const grouped = {};
     filtered.forEach(k => {
-      const key = `${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
+      const key = `${k.f_matkul_id}||${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
       if (!grouped[key]) {
         grouped[key] = {
           f_kurikulum: k.f_kurikulum,
+          f_matkul_id: k.f_matkul_id,
           f_kodemk: k.f_kodemk,
           f_namamk: k.f_namamk,
           f_sks_kurikulum: k.f_sks_kurikulum || '-',
@@ -571,35 +549,15 @@ export default function KelasPage() {
       <div style={styles.card}>
         <h1 style={styles.title}>📚 Dashboard KRS Matakuliah</h1>
 
-        {message.text && (
-          <div style={{ ...styles.message, ...(message.type === 'success' ? styles.messageSuccess : styles.messageError) }}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+        {messagePopup.show && (
+          <div style={styles.modalOverlay} onClick={closeMessagePopup}>
+            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
+              <h2 style={styles.popupTitle}>{messagePopup.type === 'success' ? '✅' : '❌'}</h2>
+              <p style={styles.popupText}>{messagePopup.text}</p>
+              <button style={styles.btnClose} onClick={closeMessagePopup}>Tutup</button>
+            </div>
           </div>
         )}
-
-        {/* TAB NAVIGATION */}
-        <div style={styles.toolbar}>
-          <div style={styles.toolbarLeft}>
-            <button
-              style={{
-                ...styles.btnPrimary,
-                ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
-              }}
-              onClick={() => setActiveTab('view')}
-            >
-              📋 Lihat Data Kelas
-            </button>
-            <button
-              style={{
-                ...styles.btnPrimary,
-                ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
-              }}
-              onClick={() => setActiveTab('add')}
-            >
-              ➕ Tambah Matakuliah
-            </button>
-          </div>
-        </div>
 
         {/* ==================== TAB 1: LIHAT KELAS ==================== */}
         {activeTab === 'view' && (
@@ -676,6 +634,30 @@ export default function KelasPage() {
                 </select>
               </div>
             )}
+
+            {/* TAB NAVIGATION - Below Kode Kurikulum */}
+            <div style={styles.toolbar}>
+              <div style={styles.toolbarLeft}>
+                <button
+                  style={{
+                    ...styles.btnPrimary,
+                    ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
+                  }}
+                  onClick={() => setActiveTab('view')}
+                >
+                  📋 Lihat Data Kelas
+                </button>
+                <button
+                  style={{
+                    ...styles.btnPrimary,
+                    ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
+                  }}
+                  onClick={() => setActiveTab('add')}
+                >
+                  ➕ Tambah Matakuliah
+                </button>
+              </div>
+            </div>
 
             <div style={styles.tableHeader}>
               <h2>📋 Daftar Kelas yang Tersimpan</h2>
@@ -762,7 +744,7 @@ export default function KelasPage() {
                       <tbody>
                         {(searchKeywordView ? getFilteredAndGroupedData() : getGroupedFilteredData()).map((group, idx) => {
                       const prodiName = prodi.find(p => p.id === group.f_kurikulum)?.nama_kurikulum || '-';
-                      const groupKey = `${group.f_kurikulum}||${group.f_kodemk}||${group.f_namamk}`;
+                      const groupKey = `${group.f_matkul_id}||${group.f_kurikulum}||${group.f_kodemk}||${group.f_namamk}`;
                       const isExpanded = expandedGroups[groupKey];
                       
                       return (
@@ -811,8 +793,8 @@ export default function KelasPage() {
 
                                     {group.classes
                                       .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas))
-                                      .map((kelas) => (
-                                        <Fragment key={kelas.id}>
+                                      .map((kelas, kelasIdx) => (
+                                        <Fragment key={`${kelas.id || 'new'}-${kelas.nama_kelas}-${kelasIdx}`}>
                                           <div style={styles.classesTableRow}>
                                             <div style={{ ...styles.classesTableCell, flex: '0 0 150px' }}>
                                               <span style={styles.badgeKelas}>{kelas.nama_kelas}</span>
@@ -824,9 +806,9 @@ export default function KelasPage() {
                                               <button
                                                 style={styles.btnEditSmall}
                                                 onClick={() => handleEditKelas(kelas)}
-                                                title="Edit dosen kelas"
+                                                title="Lihat detail kelas"
                                               >
-                                                ✏️ Edit
+                                                📋 Detail
                                               </button>
                                               <button
                                                 style={styles.btnDeleteSmall}
@@ -879,66 +861,32 @@ export default function KelasPage() {
                                       ))}
                                   </div>
 
-                                  {/* Add new class form */}
-                                  {addingForGroup === groupKey ? (
-                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f0f7ff', borderRadius: '8px' }}>
-                                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', fontWeight: '600', color: '#2d3748' }}>
-                                        ➕ Tambah Kelas Baru
-                                      </h4>
-                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                                        <input
-                                          type="text"
-                                          value={newClassData.nama_kelas}
-                                          onChange={(e) => setNewClassData({ ...newClassData, nama_kelas: e.target.value.toUpperCase() })}
-                                          placeholder="Nama kelas (A, B, C...)"
-                                          maxLength="2"
-                                          style={{ ...styles.select, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
-                                        />
-                                        <input
-                                          list="dosen-list-add"
-                                          value={newClassData.dosen}
-                                          onChange={(e) => setNewClassData({ ...newClassData, dosen: e.target.value })}
-                                          placeholder="Dosen (opsional)"
-                                          style={{ ...styles.select, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
-                                        />
-                                        <datalist id="dosen-list-add">
-                                          {dosenList.map((d) => (
-                                            <option key={d.id} value={d.f_namapegawai} />
-                                          ))}
-                                        </datalist>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button
-                                          style={{ ...styles.btnSuccess, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto', marginTop: 0, flex: 1 }}
-                                          onClick={() => handleAddClassToGroup({
-                                            f_kurikulum: group.f_kurikulum,
-                                            f_matkul_id: group.classes[0]?.f_matkul_id,
-                                          })}
-                                        >
-                                          💾 Simpan
-                                        </button>
-                                        <button
-                                          style={{ ...styles.btnSecondary, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto', marginTop: 0, flex: 1 }}
-                                          onClick={() => {
-                                            setAddingForGroup(null);
-                                            setNewClassData({ nama_kelas: '', dosen: '' });
-                                          }}
-                                        >
-                                          ❌ Batal
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      style={{ ...styles.btnPrimary, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto', marginTop: '0.75rem' }}
-                                      onClick={() => {
-                                        setAddingForGroup(groupKey);
-                                        setNewClassData({ nama_kelas: '', dosen: '' });
-                                      }}
-                                    >
-                                      ➕ Tambah Kelas
-                                    </button>
-                                  )}
+                                  {/* Edit Kelas button - navigate to add tab */}
+                                  <button
+                                    style={{ ...styles.btnPrimary, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: '100%', marginTop: '0.75rem' }}
+                                    onClick={() => {
+                                      // Load this mata kuliah in the add tab
+                                      const matkul = group.classes[0];
+                                      const mkData = {
+                                        id: matkul.f_matkul_id,
+                                        f_kodemk: matkul.f_kodemk,
+                                        f_namamk: matkul.f_namamk,
+                                        f_sks_kurikulum: matkul.f_sks_kurikulum,
+                                        f_semester: matkul.f_semester,
+                                      };
+                                      setSelectedMatkul(mkData);
+                                      setSearchMatkul(`${mkData.f_kodemk} - ${mkData.f_namamk}`);
+                                      setKelasList(group.classes.map(k => ({
+                                        id: k.id,
+                                        nama: k.nama_kelas,
+                                        dosen: k.dosen || '',
+                                        isExisting: true,
+                                      })));
+                                      setActiveTab('add');
+                                    }}
+                                  >
+                                    ✏️ Edit Kelas
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1045,6 +993,30 @@ export default function KelasPage() {
                 </select>
               </div>
             )}
+
+            {/* TAB NAVIGATION - Below Kode Kurikulum */}
+            <div style={styles.toolbar}>
+              <div style={styles.toolbarLeft}>
+                <button
+                  style={{
+                    ...styles.btnPrimary,
+                    ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
+                  }}
+                  onClick={() => setActiveTab('view')}
+                >
+                  📋 Lihat Data Kelas
+                </button>
+                <button
+                  style={{
+                    ...styles.btnPrimary,
+                    ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
+                  }}
+                  onClick={() => setActiveTab('add')}
+                >
+                  ➕ Tambah Matakuliah
+                </button>
+              </div>
+            </div>
 
             {selectedTahunAkademik && selectedKodeKurikulum ? (
               <div style={{
@@ -1163,7 +1135,7 @@ export default function KelasPage() {
                       </thead>
                       <tbody>
                         {kelasList.map((k, idx) => (
-                          <tr key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
+                          <tr key={`${k.id || k.tempId}-${k.nama}-${idx}`} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
                             <td style={styles.td}>
                               <span style={styles.badgeKelas}>{k.nama}</span>
                             </td>
@@ -1212,7 +1184,7 @@ export default function KelasPage() {
           <div style={styles.modalOverlay}>
             <div style={styles.modal}>
               <div style={styles.modalHeader}>
-                <h2>✏️ Edit Kelas</h2>
+                <h2>{editingKelas.isDetailOnly ? '📋 Detail Kelas' : '✏️ Edit Kelas'}</h2>
                 <button
                   style={styles.btnClose}
                   onClick={() => {
@@ -1236,7 +1208,6 @@ export default function KelasPage() {
                     style={{ ...styles.select, backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
                   />
                   <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.5rem' }}>
-                    (Nama kelas tidak dapat diubah)
                   </p>
                 </div>
 
@@ -1255,15 +1226,16 @@ export default function KelasPage() {
                   <input
                     type="text"
                     value={editingKelas.dosen || ''}
-                    onChange={(e) => handleEditDosenChange(e.target.value)}
-                    onFocus={() => setShowDosenDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowDosenDropdown(false), 200)}
+                    onChange={editingKelas.isDetailOnly ? undefined : (e) => handleEditDosenChange(e.target.value)}
+                    onFocus={editingKelas.isDetailOnly ? undefined : () => setShowDosenDropdown(true)}
+                    onBlur={editingKelas.isDetailOnly ? undefined : () => setTimeout(() => setShowDosenDropdown(false), 200)}
                     placeholder="Ketik atau pilih dosen..."
-                    style={styles.select}
+                    disabled={editingKelas.isDetailOnly}
+                    style={{ ...styles.select, backgroundColor: editingKelas.isDetailOnly ? '#f0f0f0' : undefined, cursor: editingKelas.isDetailOnly ? 'not-allowed' : 'text' }}
                   />
                   
-                  {/* Dosen Search Dropdown */}
-                  {showDosenDropdown && (
+                  {/* Dosen Search Dropdown - hanya tampil jika tidak detail mode */}
+                  {!editingKelas.isDetailOnly && showDosenDropdown && (
                     <div style={styles.dosenDropdownModal}>
                       {dosenList
                         .filter(d =>
@@ -1304,7 +1276,6 @@ export default function KelasPage() {
                     style={{ ...styles.select, backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
                   />
                   <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.5rem' }}>
-                    (Display name otomatis ter-regenerate)
                   </p>
                 </div>
 
@@ -1360,14 +1331,16 @@ export default function KelasPage() {
                     setShowDosenDropdown(false);
                   }}
                 >
-                  ❌ Batal
+                  {editingKelas.isDetailOnly ? '✕ Tutup' : '❌ Batal'}
                 </button>
-                <button
-                  style={styles.btnSuccess}
-                  onClick={handleSaveEdit}
-                >
-                  💾 Simpan Perubahan
-                </button>
+                {!editingKelas.isDetailOnly && (
+                  <button
+                    style={styles.btnSuccess}
+                    onClick={handleSaveEdit}
+                  >
+                    💾 Simpan Perubahan
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1382,7 +1355,7 @@ const styles = {
   // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    background: '#f4f6fb',
+    backgroundColor: '#f4f6fb',
     padding: '2rem',
     fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
   },
@@ -1408,7 +1381,7 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     margin: 0,
     letterSpacing: '0.02em',
   },
@@ -1539,10 +1512,10 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    backgroundColor: 'white',
   },
   toggleButtonActive: {
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    backgroundColor: '#7b1fa2',
+    backgroundImage: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
     color: 'white',
     borderColor: '#7b1fa2',
     boxShadow: '0 4px 12px rgba(123,31,162,0.35)',
@@ -1682,6 +1655,41 @@ const styles = {
     transition: 'background 0.2s',
     color: '#b71c1c',
   },
+
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '14px',
+    width: '360px',
+    maxWidth: '90vw',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    overflow: 'hidden',
+    padding: '2rem',
+    textAlign: 'center',
+  },
+  popupTitle: {
+    fontSize: '2.5rem',
+    margin: '0 0 1rem 0',
+    lineHeight: 1,
+  },
+  popupText: {
+    fontSize: '0.95rem',
+    color: '#37474f',
+    margin: '0 0 1.5rem 0',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-line',
+  },
+  btnClose: {
+    padding: '0.6rem 1.5rem',
+    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s',
+  },
+
   btnExpand: {
     background: '#ede7f6',
     border: 'none',

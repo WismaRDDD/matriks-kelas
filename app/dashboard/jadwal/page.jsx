@@ -10,7 +10,7 @@ export default function JadwalPage() {
   const [kelasList, setKelasList] = useState([]);
   const [jadwalData, setJadwalData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
 
   const [presets] = useState({
     Normal: {
@@ -55,6 +55,12 @@ export default function JadwalPage() {
   const [showCreateCopyModal, setShowCreateCopyModal] = useState(false);
   const [copyOperationPending, setCopyOperationPending] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [dosenList, setDosenList] = useState([]);
+  const [showPreferenceModal, setShowPreferenceModal] = useState(false);
+  const [selectedDosenForPref, setSelectedDosenForPref] = useState(null);
+  const [preferences, setPreferences] = useState({});
+  const [floorPreferences, setFloorPreferences] = useState({ 1: true, 2: true, 3: true, 4: true });
+  const [databasePresetsList, setDatabasePresetsList] = useState([]);
 
   const tableRef = useRef(null);
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -64,10 +70,12 @@ export default function JadwalPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [kelasRes, jadwalRes, ruanganRes] = await Promise.all([
+      const [kelasRes, jadwalRes, ruanganRes, dosenRes, presetsRes] = await Promise.all([
         fetch('/api/kelas'),
         fetch('/api/jadwal'),
-        fetch('/api/ruangan')
+        fetch('/api/ruangan'),
+        fetch('/api/dosen'),
+        fetch('/api/jadwal/presets')
       ]);
       
       if (!kelasRes.ok) {
@@ -86,8 +94,14 @@ export default function JadwalPage() {
       const kelas = await kelasRes.json();
       const jadwal = await jadwalRes.json();
       const ruangan = await ruanganRes.json();
-      setKelasList(Array.isArray(kelas) ? kelas : []);
+      const dosen = await dosenRes.json();
+      const presets = await presetsRes.json();
+      // Deduplicate kelas by id
+      const uniqueKelas = Array.from(new Map((Array.isArray(kelas) ? kelas : []).map(k => [k.id, k])).values());
+      setKelasList(uniqueKelas);
       setRuanganList(Array.isArray(ruangan) ? ruangan : []);
+      setDosenList(Array.isArray(dosen) ? dosen : []);
+      setDatabasePresetsList(Array.isArray(presets) ? presets : []);
       const organizedJadwal = {};
       days.forEach((day) => { organizedJadwal[day] = {}; });
       const jadwalArray = Array.isArray(jadwal) ? jadwal : [];
@@ -99,7 +113,7 @@ export default function JadwalPage() {
       setJadwalData(organizedJadwal);
     } catch {
       showMessage('error', 'Error loading data. Please try again.');
-      setKelasList([]); setRuanganList([]);
+      setKelasList([]); setRuanganList([]); setDosenList([]); setDatabasePresetsList([]);
     } finally { setLoading(false); }
   };
 
@@ -184,23 +198,19 @@ export default function JadwalPage() {
       setCopyOperationPending(true);
       setCopyMessage('Membuat copy jadwal...');
 
-      // Get all current jadwal IDs
+      // Get all current jadwal IDs - convert semester string to numbers [1,3,5,7] or [2,4,6,8]
       const semesterNumbers = getSemesterNumbers(selectedSemester);
       const jadwalIds = Object.values(jadwalData)
+        .flatMap(dayData => Object.values(dayData || {}))
         .flat()
-        .filter(j => semesterNumbers.includes(Number(j.semester || 0)))
+        .filter(j => semesterNumbers.includes(Number(j.semester)))
         .map(j => j.id);
 
-      if (jadwalIds.length === 0) {
-        showMessage('error', 'Tidak ada jadwal untuk dicopy');
-        setShowCreateCopyModal(false);
-        return;
-      }
-
+      // Allow copy even if jadwal is empty - removed the check that prevented empty copy
       const res = await fetch('/api/jadwal-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(jadwalIds),
+        body: JSON.stringify(jadwalIds.length > 0 ? jadwalIds : []),
       });
 
       const result = await res.json();
@@ -224,11 +234,12 @@ export default function JadwalPage() {
       setCopyOperationPending(true);
       setCopyMessage('Menyimpan perubahan ke copy...');
 
-      // Get all current jadwal IDs and sync them
+      // Get all current jadwal IDs and sync them - convert semester string to numbers
       const semesterNumbers = getSemesterNumbers(selectedSemester);
       const jadwalItems = Object.values(jadwalData)
+        .flatMap(dayData => Object.values(dayData || {}))
         .flat()
-        .filter(j => semesterNumbers.includes(Number(j.semester || 0)));
+        .filter(j => semesterNumbers.includes(Number(j.semester)));
 
       // Update each jadwal_copy with latest data
       for (const jadwal of jadwalItems) {
@@ -248,6 +259,142 @@ export default function JadwalPage() {
       showMessage('error', `Error: ${err.message}`);
     } finally {
       setCopyOperationPending(false);
+    }
+  };
+
+  const handleEditDosenPreference = async (dosen) => {
+    setSelectedDosenForPref(dosen);
+    
+    // Initialize preferences grid
+    const newPreferences = {};
+    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    
+    days.forEach((day, index) => {
+      newPreferences[day] = {};
+      databasePresetsList.forEach((preset) => {
+        const sessions = generateSessions(preset.jam_mulai, preset.jam_selesai, preset.durasi_slot, preset, day);
+        sessions.forEach((session) => {
+          // Default: all checked except Saturday
+          newPreferences[day][session] = index !== 5;
+        });
+      });
+    });
+
+    // Load existing preferences
+    try {
+      const res = await fetch(`/api/dosen/preferences?dosenId=${dosen.id}`);
+      if (res.ok) {
+        const existingPrefs = await res.json();
+        if (existingPrefs.length > 0) {
+          existingPrefs.forEach((pref) => {
+            if (newPreferences[pref.hari]) {
+              newPreferences[pref.hari][pref.sesi] = pref.is_available;
+            }
+          });
+          
+          // Load floor preferences if exists
+          const dosenWithFloors = existingPrefs[0]?.dosen_prefer_lantai;
+          if (dosenWithFloors) {
+            const floorsArray = dosenWithFloors.split(',').map(f => parseInt(f.trim()));
+            setFloorPreferences({ 1: floorsArray.includes(1), 2: floorsArray.includes(2), 3: floorsArray.includes(3), 4: floorsArray.includes(4) });
+          } else {
+            setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+          }
+        } else {
+          setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading preferences:', err);
+      setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+    }
+
+    setPreferences(newPreferences);
+    setShowPreferenceModal(true);
+  };
+
+  const generateSessions = (jamMulai, jamSelesai, durasi, preset, day = 'Senin') => {
+    const sessions = [];
+    if (!jamMulai || !jamSelesai || !durasi) {
+      return sessions;
+    }
+    
+    const durasiNumber = typeof durasi === 'string' ? parseInt(durasi, 10) : durasi;
+    let current = jamBulaiToMinutes(jamMulai);
+    const end = jamBulaiToMinutes(jamSelesai);
+    
+    let breakStart = null;
+    let breakEnd = null;
+    
+    if (preset) {
+      if (day === 'Jumat') {
+        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_jumat || '11:20');
+        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_jumat || '13:30');
+      } else if (day === 'Sabtu') {
+        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_sabtu || '12:10');
+        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_sabtu || '13:00');
+      } else {
+        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_senin_kamis || '12:10');
+        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_senin_kamis || '13:00');
+      }
+    }
+    
+    while (current < end) {
+      const sessionStart = current;
+      const sessionEnd = current + durasiNumber;
+      
+      if (breakStart !== null && breakEnd !== null) {
+        if (sessionEnd > breakStart && sessionStart < breakEnd) {
+          current = breakEnd;
+          continue;
+        }
+      }
+      
+      const start = minutesToTime(sessionStart);
+      const finish = minutesToTime(sessionEnd);
+      sessions.push(`${start}-${finish}`);
+      current = sessionEnd;
+    }
+    return sessions;
+  };
+
+  const jamBulaiToMinutes = (time) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const minutesToTime = (minutes) => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const handleSaveDosenPreference = async () => {
+    try {
+      const preferredFloors = Object.keys(floorPreferences)
+        .filter(floor => floorPreferences[floor])
+        .join(',');
+      
+      const res = await fetch('/api/dosen/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dosenId: selectedDosenForPref.id,
+          preferences,
+          preferredFloors: preferredFloors || '1,2,3,4',
+        }),
+      });
+
+      if (!res.ok) {
+        const result = await res.json();
+        throw new Error(result.error || 'Gagal menyimpan preferensi');
+      }
+
+      showMessage('success', `✅ Preferensi ${selectedDosenForPref.f_namapegawai} berhasil disimpan`);
+      setShowPreferenceModal(false);
+    } catch (err) {
+      console.error('Error saving preferences:', err);
+      showMessage('error', `❌ ${err.message}`);
     }
   };
 
@@ -277,9 +424,11 @@ export default function JadwalPage() {
       let ruangan = Array.isArray(ruanganRaw) ? ruanganRaw : [];
       const semesterNumbers = getSemesterNumbers(semester);
       kelas = kelas.filter((k) => { const kSemester = Number(k.f_semester || k.semester || k.matkul_semester || 0); return String(k.f_tahun_akademik) === String(tahunId) && semesterNumbers.includes(kSemester); });
-      const kelasIds = kelas.map((k) => k.id);
+      // Deduplicate kelas by id to prevent React key warnings
+      const uniqueKelas = Array.from(new Map(kelas.map(k => [k.id, k])).values());
+      const kelasIds = uniqueKelas.map((k) => k.id);
       jadwal = jadwal.filter((j) => kelasIds.includes(j.f_kelas || j.kelas_id));
-      setKelasList(kelas);
+      setKelasList(uniqueKelas);
       setRuanganList(ruangan);
       const organizedJadwal = {};
       days.forEach((day) => { organizedJadwal[day] = {}; });
@@ -291,9 +440,14 @@ export default function JadwalPage() {
   useEffect(() => { if (selectedTahunAkademik && selectedSemester) { fetchKelasAndJadwalBySemester(selectedTahunAkademik, selectedSemester); } else { setKelasList([]); setJadwalData({}); } }, [selectedTahunAkademik, selectedSemester]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setSelectedJamMulai(settings.jamMulai); setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1)); }, [settings.durasiSlot, activePreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showMessage = (type, text) => { setMessage({ type, text }); setTimeout(() => setMessage({ type: '', text: '' }), 3000); };
+  const showMessage = (type, text) => {
+    setMessagePopup({ show: true, type, text });
+  };
+
+  const closeMessagePopup = () => {
+    setMessagePopup({ show: false, type: '', text: '' });
+  };
   const timeToMinutes = (timeStr) => { if (!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number); return h * 60 + m; };
-  const minutesToTime = (minutes) => { const h = String(Math.floor(minutes / 60)).padStart(2, '0'); const m = String(minutes % 60).padStart(2, '0'); return `${h}:${m}`; };
   const getBreakTimes = (hari) => { const isJumat = hari === 'Jumat'; const isSabtu = hari === 'Sabtu'; return { mulai: isJumat ? settings.jamIstirahatMulaiJumat : isSabtu ? settings.jamIstirahatMulaiSabtu : settings.jamIstirahatMulaiSeninKamis, selesai: isJumat ? settings.jamIstirahatSelesaiJumat : isSabtu ? settings.jamIstirahatSelesaiSabtu : settings.jamIstirahatSelesaiSeninKamis }; };
 
   const generateTimeSlots = (hari) => {
@@ -313,6 +467,32 @@ export default function JadwalPage() {
   const findExistingKelasSchedule = (kelasId) => { const semesterNumbers = getSemesterNumbersForComparison(selectedSemester); for (const hari of days) { const dayData = jadwalData[hari] || {}; for (const ruanganId in dayData) { const sessions = dayData[ruanganId]; const found = sessions.find((s) => s.kelas_id === kelasId && semesterNumbers.includes(Number(s.semester))); if (found) return { found: true, hari, jamMulai: found.jam_mulai, jamSelesai: found.jam_selesai, ruangan: ruanganList.find((r) => r.id === parseInt(ruanganId))?.f_namaruang || 'Ruangan tidak diketahui' }; } } return { found: false }; };
   const isSessionCutByBreak = (hari, jamMulai, jamSelesai, sks = 1) => { if (sks < 2) return false; const breakTimes = getBreakTimes(hari); const breakStartMin = timeToMinutes(breakTimes.mulai); const breakEndMin = timeToMinutes(breakTimes.selesai); const sessionStartMin = timeToMinutes(jamMulai); const sessionEndMin = timeToMinutes(jamSelesai); return sessionStartMin < breakEndMin && sessionEndMin > breakStartMin; };
   const findOverlappingSession = (hari, ruanganId, jamMulai, jamSelesai) => { const dayData = jadwalData[hari] || {}; const sessionsInRuangan = dayData[parseInt(ruanganId)] || []; const newStart = timeToMinutes(jamMulai); const newEnd = timeToMinutes(jamSelesai); const semesterNumbers = getSemesterNumbersForComparison(selectedSemester); for (const existingSession of sessionsInRuangan) { if (!semesterNumbers.includes(Number(existingSession.semester))) continue; if (editingSession && existingSession.id === editingSession.id) continue; const existingStart = timeToMinutes(existingSession.jam_mulai); const existingEnd = timeToMinutes(existingSession.jam_selesai); if (newStart < existingEnd && newEnd > existingStart) return { found: true, conflictName: existingSession.display_name, conflictTime: `${existingSession.jam_mulai}-${existingSession.jam_selesai}` }; } return { found: false }; }
+
+  const hasFormData = () => {
+    return sessionInput.trim().length > 0 || selectedKelas !== null;
+  };
+
+  const resetFormFields = () => {
+    setSessionInput('');
+    setSelectedKelas(null);
+    setSessionInputMode('manual');
+    setSelectedJamMulai(settings.jamMulai);
+    setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1));
+    setEditingSession(null);
+  };
+
+  const handleSessionModalOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      if (hasFormData()) {
+        if (window.confirm('⚠️ Form memiliki data yang belum disimpan. Tutup tanpa menyimpan?')) {
+          resetFormFields();
+          setShowSessionModal(false);
+        }
+      } else {
+        setShowSessionModal(false);
+      }
+    }
+  };
 
   const handleSetDefaultPreset = async (presetId) => {
     try {
@@ -479,6 +659,40 @@ export default function JadwalPage() {
     dayToggleCard: { backgroundColor: '#fafbff', borderRadius: '10px', border: '1px solid #e8eaf6', padding: '1rem 1.5rem', marginBottom: '1.5rem' },
     // Preset info
     presetInfoBox: { backgroundColor: '#e8eaf6', borderRadius: '8px', padding: '0.75rem 1rem', marginTop: '0.75rem', fontSize: '0.8rem', color: '#283593' },
+    // Popup modal styling
+    popupBox: {
+      background: 'white',
+      borderRadius: '14px',
+      width: '360px',
+      maxWidth: '90vw',
+      boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+      overflow: 'hidden',
+      padding: '2rem',
+      textAlign: 'center',
+    },
+    popupTitle: {
+      fontSize: '2.5rem',
+      margin: '0 0 1rem 0',
+      lineHeight: 1,
+    },
+    popupText: {
+      fontSize: '0.95rem',
+      color: '#37474f',
+      margin: '0 0 1.5rem 0',
+      lineHeight: '1.5',
+      whiteSpace: 'pre-line',
+    },
+    popupBtn: {
+      padding: '0.6rem 1.5rem',
+      background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'opacity 0.2s',
+    },
   };
 
   if (checking) return (
@@ -513,10 +727,14 @@ export default function JadwalPage() {
         {/* ── Spacer ── */}
         <div style={{ height: '1.5rem' }} />
 
-        {/* ── Alert ── */}
-        {message.text && (
-          <div style={message.type === 'success' ? s.alertSuccess : s.alertError}>
-            {message.type === 'success' ? '✅' : '❌'} {message.text}
+        {/* ── Message Popup ── */}
+        {messagePopup.show && (
+          <div style={s.overlay} onClick={closeMessagePopup}>
+            <div style={s.popupBox} onClick={(e) => e.stopPropagation()}>
+              <h2 style={s.popupTitle}>{messagePopup.type === 'success' ? '✅' : '❌'}</h2>
+              <p style={s.popupText}>{messagePopup.text}</p>
+              <button style={s.popupBtn} onClick={closeMessagePopup}>Tutup</button>
+            </div>
           </div>
         )}
 
@@ -556,6 +774,45 @@ export default function JadwalPage() {
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => setShowCreateCopyModal(true)} style={s.btnSavePreset}>📋 Buat Copy Jadwal</button>
               <button onClick={handleSaveJadwalCopyChanges} style={s.btnSavePreset}>💾 Save Perubahan</button>
+              {dosenList.length > 0 && (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <button 
+                    onClick={() => {
+                      setSelectedDosenForPref(dosenList[0]);
+                      handleEditDosenPreference(dosenList[0]);
+                    }}
+                    style={{ ...s.btnSavePreset, backgroundColor: 'rgba(100, 200, 150, 0.3)' }}
+                    title="Pilih dosen untuk edit preferensi"
+                  >
+                    👥 Kelola Preferensi Dosen
+                  </button>
+                  {dosenList.length > 1 && (
+                    <select
+                      onChange={(e) => {
+                        const dosen = dosenList.find(d => d.id === parseInt(e.target.value));
+                        if (dosen) {
+                          setSelectedDosenForPref(dosen);
+                          handleEditDosenPreference(dosen);
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '0',
+                        right: '0',
+                        opacity: '0',
+                        width: '100%',
+                        height: '100%',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">Pilih dosen</option>
+                      {dosenList.map(d => (
+                        <option key={d.id} value={d.id}>{d.f_namapegawai}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div style={s.cardBody}>
@@ -631,9 +888,8 @@ export default function JadwalPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
               <button onClick={() => setShowAutoGenModal(true)} style={s.btnPurple}>⚡ Generate Otomatis</button>
               <button onClick={exportToXLSX} style={s.btnSuccess}>📊 Export XLSX</button>
-              {hasPresetChanges() && (
-                <button onClick={handleUpdatePreset} style={s.btnAmber} title={`Simpan perubahan ke preset "${activePreset}"`}>💾 Simpan Perubahan</button>
-              )}
+              <button onClick={() => setShowSavePresetModal(true)} style={s.btnPrimary}>💾 Simpan Preset Baru</button>
+              <button onClick={handleUpdatePreset} style={s.btnAmber} title={`Simpan perubahan ke preset "${activePreset}"`}>💾 Simpan Perubahan</button>
             </div>
           </div>
         </div>
@@ -741,11 +997,11 @@ export default function JadwalPage() {
 
       {/* ── Session Modal ── */}
       {showSessionModal && (
-        <div style={s.overlay}>
+        <div style={s.overlay} onClick={handleSessionModalOverlayClick}>
           <div style={s.modalBox}>
             <div style={s.modalHeader}>
               <h2 style={s.modalTitle}>{editingSession ? '✏️ Edit Sesi' : '➕ Tambah Sesi'}</h2>
-              <button style={s.btnClose} onClick={() => { setShowSessionModal(false); setSessionInput(''); setEditingSession(null); setSelectedKelas(null); setSessionInputMode('manual'); setSelectedJamMulai(settings.jamMulai); setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1)); }}>✕</button>
+              <button style={s.btnClose} onClick={() => { resetFormFields(); setShowSessionModal(false); }}>✕</button>
             </div>
             <div style={s.modalBody}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -812,7 +1068,7 @@ export default function JadwalPage() {
                 const isDisabled = isDuplicate || isCutByBreak || isOverlap;
                 return (
                   <div style={s.modalFooter}>
-                    <button onClick={() => { setShowSessionModal(false); setSessionInput(''); setEditingSession(null); setSelectedKelas(null); setSessionInputMode('manual'); setSelectedJamMulai(settings.jamMulai); setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1)); }} style={s.btnGray}>Batal</button>
+                    <button onClick={() => { resetFormFields(); setShowSessionModal(false); }} style={s.btnGray}>Batal</button>
                     <button onClick={handleAddSession} disabled={isDisabled} style={isDisabled ? s.btnGrayDisabled : s.btnPrimary}>{editingSession ? 'Update' : 'Simpan'}</button>
                   </div>
                 );
@@ -866,6 +1122,9 @@ export default function JadwalPage() {
                   <li>Jam Mulai: <code>{settings.jamMulai}</code></li>
                   <li>Durasi Slot: <code>{settings.durasiSlot} menit</code></li>
                   <li>Jam Selesai: <code>{settings.jamSelesai}</code></li>
+                  <li>Istirahat Senin-Kamis: <code>{settings.jamIstirahatMulaiSeninKamis} - {settings.jamIstirahatSelesaiSeninKamis}</code></li>
+                  <li>Istirahat Sabtu: <code>{settings.jamIstirahatMulaiSabtu} - {settings.jamIstirahatSelesaiSabtu}</code></li>
+                  <li>Istirahat Jumat: <code>{settings.jamIstirahatMulaiJumat} - {settings.jamIstirahatSelesaiJumat}</code></li>
                 </ul>
               </div>
               <div style={s.modalFooter}>
@@ -905,6 +1164,156 @@ export default function JadwalPage() {
                 </button>
                 <button onClick={handleCreateJadwalCopy} disabled={copyOperationPending} style={copyOperationPending ? s.btnGrayDisabled : s.btnPrimary}>
                   {copyOperationPending ? 'Memproses...' : '📋 Buat Copy Jadwal'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Preferensi Dosen Modal ── */}
+      {showPreferenceModal && selectedDosenForPref && (
+        <div style={s.overlay} onClick={() => setShowPreferenceModal(false)}>
+          <div style={{ ...s.modalBox, maxWidth: '900px', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <h2 style={s.modalTitle}>📅 Preferensi {selectedDosenForPref.f_namapegawai}</h2>
+              <button style={s.btnClose} onClick={() => setShowPreferenceModal(false)}>✕</button>
+            </div>
+            <div style={s.modalBody}>
+              {databasePresetsList.length > 0 && databasePresetsList[0]?.jam_mulai ? (
+                <>
+                  <div style={s.presetInfoBox}>
+                    <strong>📋 Preset Aktif:</strong> {databasePresetsList[0].nama_preset || 'Default'}
+                    <br />
+                    <small>
+                      ({databasePresetsList[0].jam_mulai} - {databasePresetsList[0].jam_selesai}, Durasi: {databasePresetsList[0].durasi_slot} menit)
+                    </small>
+                  </div>
+
+                  {/* Floor Preferences Section */}
+                  <div style={{...s.presetInfoBox, marginTop: '1rem'}}>
+                    <strong>🏢 Preferensi Lantai:</strong>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                      {[1, 2, 3, 4].map((floor) => (
+                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#37474f', fontWeight: '500' }}>
+                          <input
+                            type="checkbox"
+                            checked={floorPreferences[floor] || false}
+                            onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#7b1fa2' }}
+                          />
+                          Lantai {floor}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '1.5rem', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', marginBottom: '1rem' }}>
+                      <thead>
+                        <tr style={{ background: 'linear-gradient(135deg,#7b1fa2 0%,#4527a0 100%)' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', color: 'white', fontWeight: 700, fontSize: '0.78rem', minWidth: '80px', border: '1px solid #e8eaf6' }}>
+                            <input
+                              type="checkbox"
+                              checked={(() => {
+                                const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                                let total = 0, checked = 0;
+                                days.forEach((day) => {
+                                  Object.keys(preferences[day] || {}).forEach((session) => {
+                                    total++;
+                                    if (preferences[day][session]) checked++;
+                                  });
+                                });
+                                return total > 0 && checked === total;
+                              })()}
+                              onChange={() => {
+                                setPreferences((prev) => {
+                                  const updated = { ...prev };
+                                  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                                  let total = 0, checked = 0;
+                                  days.forEach((day) => {
+                                    Object.keys(updated[day] || {}).forEach((session) => {
+                                      total++;
+                                      if (updated[day][session]) checked++;
+                                    });
+                                  });
+                                  const allChecked = total > 0 && checked === total;
+                                  const newValue = !allChecked;
+                                  days.forEach((day) => {
+                                    Object.keys(updated[day] || {}).forEach((session) => {
+                                      updated[day][session] = newValue;
+                                    });
+                                  });
+                                  return updated;
+                                });
+                              }}
+                              style={{ accentColor: '#7b1fa2', cursor: 'pointer' }}
+                              title="Pilih Semua"
+                            />
+                          </th>
+                          {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
+                            <th key={day} style={{ padding: '0.75rem', textAlign: 'center', color: 'white', fontWeight: 700, fontSize: '0.78rem', minWidth: '100px', border: '1px solid #e8eaf6' }}>
+                              {day}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(preferences['Senin'] || {}).map((session) => (
+                          <tr key={session} style={{ borderBottom: '1px solid #f0f2ff' }}>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem', backgroundColor: '#fafbff', border: '1px solid #f0f2ff', minWidth: '80px' }}>
+                              {session}
+                            </td>
+                            {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
+                              <td key={`${day}-${session}`} style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #f0f2ff', backgroundColor: preferences[day]?.[session] ? '#e8f5e9' : 'white' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={preferences[day]?.[session] || false}
+                                  onChange={(e) => {
+                                    setPreferences({
+                                      ...preferences,
+                                      [day]: {
+                                        ...preferences[day],
+                                        [session]: e.target.checked
+                                      }
+                                    });
+                                  }}
+                                  style={{ accentColor: '#7b1fa2', cursor: 'pointer', width: '18px', height: '18px' }}
+                                  title={`${day} jam ${session}`}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style={s.presetInfoBox}>
+                    <small>✅ = Tersedia | ☐ = Tidak tersedia | Default: Semua hari tersedia kecuali Sabtu</small>
+                  </div>
+                </>
+              ) : (
+                <div style={s.errRed}>
+                  <strong>⚠️ Belum ada preset jadwal</strong>
+                  <br />
+                  <small>Silakan buat preset terlebih dahulu di bagian Jadwal Copy</small>
+                </div>
+              )}
+
+              <div style={s.modalFooter}>
+                <button
+                  onClick={() => setShowPreferenceModal(false)}
+                  style={s.btnGray}
+                >
+                  ❌ Batal
+                </button>
+                <button
+                  onClick={handleSaveDosenPreference}
+                  disabled={databasePresetsList.length === 0}
+                  style={databasePresetsList.length === 0 ? s.btnGrayDisabled : s.btnPrimary}
+                >
+                  💾 Simpan
                 </button>
               </div>
             </div>
