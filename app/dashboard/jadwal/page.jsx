@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
 
 export default function JadwalPage() {
   const router = useRouter();
@@ -12,7 +11,7 @@ export default function JadwalPage() {
   const [loading, setLoading] = useState(true);
   const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
 
-  const [presets] = useState({
+  const [presets, setPresets] = useState({
     Normal: {
       jamMulai: '07:10', durasiSlot: 50,
       jamIstirahatMulaiSeninKamis: '12:10', jamIstirahatSelesaiSeninKamis: '13:00',
@@ -31,6 +30,7 @@ export default function JadwalPage() {
 
   const [activePreset, setActivePreset] = useState('Normal');
   const [settings, setSettings] = useState(presets.Normal);
+  const [selectedPresetOption, setSelectedPresetOption] = useState('Normal');
   const [visibleDays, setVisibleDays] = useState({ Senin: true, Selasa: true, Rabu: true, Kamis: true, Jumat: true, Sabtu: true });
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [sessionInput, setSessionInput] = useState('');
@@ -44,17 +44,10 @@ export default function JadwalPage() {
   const [editingSession, setEditingSession] = useState(null);
   const [showAutoGenModal, setShowAutoGenModal] = useState(false);
   const [autoGenSettings, setAutoGenSettings] = useState({ fillEmptyOnly: true, usePreferences: true });
-  const [showPresetsSection, setShowPresetsSection] = useState(true);
-  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
-  const [newPresetName, setNewPresetName] = useState('');
   const [databasePresets, setDatabasePresets] = useState([]);
-  const [presetSaving, setPresetSaving] = useState(false);
   const [tahunAkademikList, setTahunAkademikList] = useState([]);
   const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('Gasal');
-  const [showCreateCopyModal, setShowCreateCopyModal] = useState(false);
-  const [copyOperationPending, setCopyOperationPending] = useState(false);
-  const [copyMessage, setCopyMessage] = useState('');
   const [dosenList, setDosenList] = useState([]);
   const [showPreferenceModal, setShowPreferenceModal] = useState(false);
   const [selectedDosenForPref, setSelectedDosenForPref] = useState(null);
@@ -141,126 +134,9 @@ export default function JadwalPage() {
     if (!checking) {
       fetchData();
       fetchTahunAkademik();
-      fetchPresets();
     }
   }, [checking]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchPresets = async () => {
-    try {
-      const res = await fetch('/api/preset');
-      const data = await res.json();
-      setDatabasePresets(Array.isArray(data) ? data : []);
-    } catch (error) { console.warn('Gagal fetch presets:', error.message); setDatabasePresets([]); }
-  };
-
-  const handleSavePreset = async () => {
-    if (!newPresetName.trim()) { showMessage('error', 'Nama preset tidak boleh kosong'); return; }
-    if (databasePresets.some((p) => p.nama_preset.toLowerCase() === newPresetName.toLowerCase())) { showMessage('error', 'Preset dengan nama ini sudah ada'); return; }
-    try {
-      setPresetSaving(true);
-      const res = await fetch('/api/preset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama_preset: newPresetName, jam_mulai: settings.jamMulai, durasiSlot: settings.durasiSlot, jamIstirahatMulaiSeninKamis: settings.jamIstirahatMulaiSeninKamis, jamIstirahatSelesaiSeninKamis: settings.jamIstirahatSelesaiSeninKamis, jamIstirahatMulaiSabtu: settings.jamIstirahatMulaiSabtu, jamIstirahatSelesaiSabtu: settings.jamIstirahatSelesaiSabtu, jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat, jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat, jamSelesai: settings.jamSelesai, is_default: false }) });
-      const result = await res.json();
-      if (!res.ok) { showMessage('error', result.error || 'Gagal menyimpan preset'); return; }
-      showMessage('success', `Preset "${newPresetName}" berhasil disimpan`);
-      setNewPresetName(''); setShowSavePresetModal(false); await fetchPresets();
-    } catch (err) { showMessage('error', `Error: ${err.message}`); } finally { setPresetSaving(false); }
-  };
-
-  const handleDeletePreset = async (presetId, presetName) => {
-    if (!confirm(`Hapus preset "${presetName}"?`)) return;
-    try {
-      const res = await fetch('/api/preset', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: presetId }) });
-      const result = await res.json();
-      if (!res.ok) { showMessage('error', result.error || 'Gagal menghapus preset'); return; }
-      showMessage('success', `Preset "${presetName}" berhasil dihapus`); await fetchPresets();
-    } catch (err) { showMessage('error', `Error: ${err.message}`); }
-  };
-
-  const handleUpdatePreset = async () => {
-    const currentPreset = databasePresets.find((p) => p.nama_preset === activePreset);
-    if (!currentPreset) { showMessage('error', 'Preset harus dipilih dari database untuk diupdate'); return; }
-    try {
-      const res = await fetch('/api/preset', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentPreset.id, jam_mulai: settings.jamMulai, durasiSlot: settings.durasiSlot, jamIstirahatMulaiSeninKamis: settings.jamIstirahatMulaiSeninKamis, jamIstirahatSelesaiSeninKamis: settings.jamIstirahatSelesaiSeninKamis, jamIstirahatMulaiSabtu: settings.jamIstirahatMulaiSabtu, jamIstirahatSelesaiSabtu: settings.jamIstirahatSelesaiSabtu, jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat, jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat, jamSelesai: settings.jamSelesai }) });
-      const result = await res.json();
-      if (!res.ok) { showMessage('error', result.error || 'Gagal mengupdate preset'); return; }
-      showMessage('success', `Preset "${activePreset}" berhasil diupdate`); await fetchPresets();
-    } catch (err) { showMessage('error', `Error: ${err.message}`); }
-  };
-
-  const hasPresetChanges = () => {
-    const currentPreset = databasePresets.find((p) => p.nama_preset === activePreset);
-    if (!currentPreset) return false;
-    return settings.jamMulai !== currentPreset.jam_mulai || settings.durasiSlot !== currentPreset.durasi_slot || settings.jamIstirahatMulaiSeninKamis !== currentPreset.jam_istirahat_mulai_senin_kamis || settings.jamIstirahatSelesaiSeninKamis !== currentPreset.jam_istirahat_selesai_senin_kamis || settings.jamIstirahatMulaiSabtu !== currentPreset.jam_istirahat_mulai_sabtu || settings.jamIstirahatSelesaiSabtu !== currentPreset.jam_istirahat_selesai_sabtu || settings.jamIstirahatMulaiJumat !== currentPreset.jam_istirahat_mulai_jumat || settings.jamIstirahatSelesaiJumat !== currentPreset.jam_istirahat_selesai_jumat || settings.jamSelesai !== currentPreset.jam_selesai;
-  };
-
-  const handleCreateJadwalCopy = async () => {
-    try {
-      setCopyOperationPending(true);
-      setCopyMessage('Membuat copy jadwal...');
-
-      // Get all current jadwal IDs - convert semester string to numbers [1,3,5,7] or [2,4,6,8]
-      const semesterNumbers = getSemesterNumbers(selectedSemester);
-      const jadwalIds = Object.values(jadwalData)
-        .flatMap(dayData => Object.values(dayData || {}))
-        .flat()
-        .filter(j => semesterNumbers.includes(Number(j.semester)))
-        .map(j => j.id);
-
-      // Allow copy even if jadwal is empty - removed the check that prevented empty copy
-      const res = await fetch('/api/jadwal-copy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(jadwalIds.length > 0 ? jadwalIds : []),
-      });
-
-      const result = await res.json();
-      if (!res.ok) {
-        showMessage('error', result.error || 'Gagal membuat copy jadwal');
-        return;
-      }
-
-      showMessage('success', `${result.count} jadwal telah dicopy`);
-      setCopyMessage(`Berhasil membuat ${result.count} copy jadwal`);
-      setTimeout(() => setShowCreateCopyModal(false), 2000);
-    } catch (err) {
-      showMessage('error', `Error: ${err.message}`);
-    } finally {
-      setCopyOperationPending(false);
-    }
-  };
-
-  const handleSaveJadwalCopyChanges = async () => {
-    try {
-      setCopyOperationPending(true);
-      setCopyMessage('Menyimpan perubahan ke copy...');
-
-      // Get all current jadwal IDs and sync them - convert semester string to numbers
-      const semesterNumbers = getSemesterNumbers(selectedSemester);
-      const jadwalItems = Object.values(jadwalData)
-        .flatMap(dayData => Object.values(dayData || {}))
-        .flat()
-        .filter(j => semesterNumbers.includes(Number(j.semester)));
-
-      // Update each jadwal_copy with latest data
-      for (const jadwal of jadwalItems) {
-        await fetch('/api/jadwal-copy', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jadwal_id: jadwal.id,
-            // learning_type and learning_time are preserved
-          }),
-        });
-      }
-
-      showMessage('success', `Perubahan jadwal telah disimpan ke copy`);
-      setTimeout(() => setShowCreateCopyModal(false), 2000);
-    } catch (err) {
-      showMessage('error', `Error: ${err.message}`);
-    } finally {
-      setCopyOperationPending(false);
-    }
-  };
 
   const handleEditDosenPreference = async (dosen) => {
     setSelectedDosenForPref(dosen);
@@ -494,18 +370,28 @@ export default function JadwalPage() {
     }
   };
 
-  const handleSetDefaultPreset = async (presetId) => {
-    try {
-      const res = await fetch('/api/preset', { 
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ id: presetId, set_as_default: true }) 
-      });
-      const result = await res.json();
-      if (!res.ok) { showMessage('error', result.error || 'Gagal mengatur default preset'); return; }
-      showMessage('success', 'Preset berhasil ditetapkan sebagai default');
-      await fetchPresets();
-    } catch (err) { showMessage('error', `Error: ${err.message}`); }
+  const handleUpdatePreset = async () => {
+    const presetKey = selectedPresetOption || activePreset || 'Normal';
+    const nextSettings = {
+      jamMulai: settings.jamMulai,
+      durasiSlot: settings.durasiSlot,
+      jamIstirahatMulaiSeninKamis: settings.jamIstirahatMulaiSeninKamis,
+      jamIstirahatSelesaiSeninKamis: settings.jamIstirahatSelesaiSeninKamis,
+      jamIstirahatMulaiSabtu: settings.jamIstirahatMulaiSabtu,
+      jamIstirahatSelesaiSabtu: settings.jamIstirahatSelesaiSabtu,
+      jamIstirahatMulaiJumat: settings.jamIstirahatMulaiJumat,
+      jamIstirahatSelesaiJumat: settings.jamIstirahatSelesaiJumat,
+      jamSelesai: settings.jamSelesai,
+    };
+
+    setPresets((prev) => ({
+      ...prev,
+      [presetKey]: nextSettings,
+    }));
+
+    setActivePreset(presetKey);
+    setSelectedPresetOption(presetKey);
+    showMessage('success', `Pengaturan preset ${presetKey} berhasil disimpan`);
   };
 
   const handleAddSession = async () => {
@@ -518,10 +404,8 @@ export default function JadwalPage() {
         if (!kelas) { showMessage('error', 'Kelas tidak ditemukan'); return; }
         displayName = kelas.display_name || kelas.nama_kelas; sks = kelas.sks || kelas.f_sks_kurikulum || 1; kelasId = kelas.id;
         
-        // Try to find dosen_id from kelas.dosen field (could be NIDN or dosen name)
         if (kelas.dosen) {
           try {
-            // First, try to match as NIDN
             const dosenRes = await fetch(`/api/dosen?nidn=${kelas.dosen}`);
             if (dosenRes.ok) {
               const dosenList = await dosenRes.json();
@@ -766,17 +650,12 @@ export default function JadwalPage() {
         <div style={s.card}>
           <div style={s.cardHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <button onClick={() => setShowPresetsSection(!showPresetsSection)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1rem' }}>
-                {showPresetsSection ? '▼' : '▶'}
-              </button>
-              <h3 style={s.cardHeaderText}>🎛️ Jadwal Copy (untuk Dosen)</h3>
+              <h3 style={s.cardHeaderText}>🎛️ Pengaturan Jadwal</h3>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => setShowCreateCopyModal(true)} style={s.btnSavePreset}>📋 Buat Copy Jadwal</button>
-              <button onClick={handleSaveJadwalCopyChanges} style={s.btnSavePreset}>💾 Save Perubahan</button>
               {dosenList.length > 0 && (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <button 
+                  <button
                     onClick={() => {
                       setSelectedDosenForPref(dosenList[0]);
                       handleEditDosenPreference(dosenList[0]);
@@ -816,80 +695,59 @@ export default function JadwalPage() {
             </div>
           </div>
           <div style={s.cardBody}>
-            {showPresetsSection && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#78909c', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>Template Preset</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '1.25rem' }}>
-                  {Object.keys(presets).map((presetName) => (
-                    <button key={presetName} onClick={() => { setActivePreset(presetName); setSettings(presets[presetName]); showMessage('success', `Preset ${presetName} diterapkan`); }}
-                      style={activePreset === presetName ? s.btnPresetActive : s.btnPresetInactive}>{presetName}</button>
-                  ))}
-                </div>
-                {databasePresets.length > 0 && (
-                  <>
-                    <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#78909c', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>Preset Tersimpan</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
-                      {databasePresets.map((preset) => (
-                        <div key={preset.id} style={{ position: 'relative', display: 'inline-block' }}>
-                          <button onClick={() => { setActivePreset(preset.nama_preset); setSettings({ jamMulai: preset.jam_mulai, durasiSlot: preset.durasi_slot, jamIstirahatMulaiSeninKamis: preset.jam_istirahat_mulai_senin_kamis, jamIstirahatSelesaiSeninKamis: preset.jam_istirahat_selesai_senin_kamis, jamIstirahatMulaiSabtu: preset.jam_istirahat_mulai_sabtu, jamIstirahatSelesaiSabtu: preset.jam_istirahat_selesai_sabtu, jamIstirahatMulaiJumat: preset.jam_istirahat_mulai_jumat, jamIstirahatSelesaiJumat: preset.jam_istirahat_selesai_jumat, jamSelesai: preset.jam_selesai }); showMessage('success', `Preset ${preset.nama_preset} diterapkan`); }}
-                            style={activePreset === preset.nama_preset ? s.btnPresetActive : s.btnPresetInactive}>{preset.nama_preset} {preset.is_default ? '⭐' : ''}</button>
-                          <div style={{ position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px' }}>
-                            <button 
-                              onClick={() => handleSetDefaultPreset(preset.id)}
-                              title={preset.is_default ? 'Sudah default' : 'Jadikan default'}
-                              style={{ background: preset.is_default ? '#ffc107' : '#b0bec5', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              ⭐
-                            </button>
-                            {!preset.is_default && (
-                              <button onClick={() => handleDeletePreset(preset.id, preset.nama_preset)}
-                                style={{ background: '#e53935', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {showPresetsSection && <div style={{ borderTop: '1px solid #f0f2ff', marginBottom: '1.5rem' }} />}
-
-            {/* Settings grid */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={s.label}>Preset</label>
+              <select
+                value={selectedPresetOption}
+                onChange={(e) => {
+                  const nextPreset = e.target.value;
+                  setSelectedPresetOption(nextPreset);
+                  setActivePreset(nextPreset);
+                  setSettings(presets[nextPreset]);
+                }}
+                style={s.select}
+              >
+                <option value="Normal">Normal</option>
+                <option value="Ramadhan">Ramadhan</option>
+              </select>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              {[
-                { label: 'Jam Mulai', type: 'time', val: settings.jamMulai, key: 'jamMulai' },
-                { label: 'Durasi per Slot (menit)', type: 'number', val: settings.durasiSlot, key: 'durasiSlot' },
-                { label: 'Jam Selesai', type: 'time', val: settings.jamSelesai, key: 'jamSelesai' },
-              ].map(({ label, type, val, key }) => (
-                <div key={key}>
-                  <label style={s.label}>{label}</label>
-                  <input type={type} value={val} min={type === 'number' ? 10 : undefined} max={type === 'number' ? 120 : undefined}
-                    onChange={(e) => setSettings({ ...settings, [key]: type === 'number' ? parseInt(e.target.value) : e.target.value })} style={s.input} />
+              <div>
+                <label style={s.label}>Jam Mulai</label>
+                <input type="time" value={settings.jamMulai} onChange={(e) => setSettings({ ...settings, jamMulai: e.target.value })} style={s.input} />
+              </div>
+              <div>
+                <label style={s.label}>Istirahat Senin-Kamis</label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input type="time" value={settings.jamIstirahatMulaiSeninKamis} onChange={(e) => setSettings({ ...settings, jamIstirahatMulaiSeninKamis: e.target.value })} style={{ ...s.input, flex: 1 }} />
+                  <span style={{ color: '#90a4ae' }}>–</span>
+                  <input type="time" value={settings.jamIstirahatSelesaiSeninKamis} onChange={(e) => setSettings({ ...settings, jamIstirahatSelesaiSeninKamis: e.target.value })} style={{ ...s.input, flex: 1 }} />
                 </div>
-              ))}
-              {[
-                { label: 'Istirahat Senin-Kamis', mulai: 'jamIstirahatMulaiSeninKamis', selesai: 'jamIstirahatSelesaiSeninKamis' },
-                { label: 'Istirahat Sabtu', mulai: 'jamIstirahatMulaiSabtu', selesai: 'jamIstirahatSelesaiSabtu' },
-                { label: 'Istirahat Jumat', mulai: 'jamIstirahatMulaiJumat', selesai: 'jamIstirahatSelesaiJumat' },
-              ].map(({ label, mulai, selesai }) => (
-                <div key={label}>
-                  <label style={s.label}>{label}</label>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <input type="time" value={settings[mulai]} onChange={(e) => setSettings({ ...settings, [mulai]: e.target.value })} style={{ ...s.input, flex: 1 }} />
-                    <span style={{ color: '#90a4ae' }}>–</span>
-                    <input type="time" value={settings[selesai]} onChange={(e) => setSettings({ ...settings, [selesai]: e.target.value })} style={{ ...s.input, flex: 1 }} />
-                  </div>
+              </div>
+              <div>
+                <label style={s.label}>Durasi per Slot (menit)</label>
+                <input type="number" value={settings.durasiSlot} min={10} max={120} onChange={(e) => setSettings({ ...settings, durasiSlot: parseInt(e.target.value) })} style={s.input} />
+              </div>
+              <div>
+                <label style={s.label}>Jam Selesai</label>
+                <input type="time" value={settings.jamSelesai} onChange={(e) => setSettings({ ...settings, jamSelesai: e.target.value })} style={s.input} />
+              </div>
+              <div>
+                <label style={s.label}>Istirahat Jumat</label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input type="time" value={settings.jamIstirahatMulaiJumat} onChange={(e) => setSettings({ ...settings, jamIstirahatMulaiJumat: e.target.value })} style={{ ...s.input, flex: 1 }} />
+                  <span style={{ color: '#90a4ae' }}>–</span>
+                  <input type="time" value={settings.jamIstirahatSelesaiJumat} onChange={(e) => setSettings({ ...settings, jamIstirahatSelesaiJumat: e.target.value })} style={{ ...s.input, flex: 1 }} />
                 </div>
-              ))}
+              </div>
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
-              <button onClick={() => setShowAutoGenModal(true)} style={s.btnPurple}>⚡ Generate Otomatis</button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
+                <button onClick={() => setShowAutoGenModal(true)} style={s.btnPurple}>⚡ Generate Otomatis</button>
+                <button onClick={handleUpdatePreset} style={s.btnAmber}>💾 Simpan Perubahan</button>
+              </div>
               <button onClick={exportToXLSX} style={s.btnSuccess}>📊 Export XLSX</button>
-              <button onClick={() => setShowSavePresetModal(true)} style={s.btnPrimary}>💾 Simpan Preset Baru</button>
-              <button onClick={handleUpdatePreset} style={s.btnAmber} title={`Simpan perubahan ke preset "${activePreset}"`}>💾 Simpan Perubahan</button>
             </div>
           </div>
         </div>
@@ -1105,72 +963,6 @@ export default function JadwalPage() {
         </div>
       )}
 
-      {/* ── Save Preset Modal ── */}
-      {showSavePresetModal && (
-        <div style={s.overlay}>
-          <div style={s.modalBox}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>� Simpan Preset Baru</h2>
-              <button style={s.btnClose} onClick={() => { setShowSavePresetModal(false); setNewPresetName(''); }}>✕</button>
-            </div>
-            <div style={s.modalBody}>
-              <label style={s.label}>Nama Preset</label>
-              <input type="text" value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Contoh: Preset Pagi, Preset Sore" onKeyPress={(e) => { if (e.key === 'Enter') handleSavePreset(); }} style={s.input} />
-              <div style={s.presetInfoBox}>
-                <strong>Konfigurasi yang akan disimpan:</strong>
-                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.78rem', lineHeight: 1.8 }}>
-                  <li>Jam Mulai: <code>{settings.jamMulai}</code></li>
-                  <li>Durasi Slot: <code>{settings.durasiSlot} menit</code></li>
-                  <li>Jam Selesai: <code>{settings.jamSelesai}</code></li>
-                  <li>Istirahat Senin-Kamis: <code>{settings.jamIstirahatMulaiSeninKamis} - {settings.jamIstirahatSelesaiSeninKamis}</code></li>
-                  <li>Istirahat Sabtu: <code>{settings.jamIstirahatMulaiSabtu} - {settings.jamIstirahatSelesaiSabtu}</code></li>
-                  <li>Istirahat Jumat: <code>{settings.jamIstirahatMulaiJumat} - {settings.jamIstirahatSelesaiJumat}</code></li>
-                </ul>
-              </div>
-              <div style={s.modalFooter}>
-                <button onClick={() => { setShowSavePresetModal(false); setNewPresetName(''); }} disabled={presetSaving} style={presetSaving ? s.btnGrayDisabled : s.btnGray}>Batal</button>
-                <button onClick={handleSavePreset} disabled={presetSaving || !newPresetName.trim()} style={presetSaving || !newPresetName.trim() ? s.btnGrayDisabled : s.btnPrimary}>{presetSaving ? 'Menyimpan...' : 'Simpan'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Create Jadwal Copy Modal ── */}
-      {showCreateCopyModal && (
-        <div style={s.overlay}>
-          <div style={s.modalBox}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>📋 Jadwal Copy untuk Dosen</h2>
-              <button style={s.btnClose} onClick={() => { setShowCreateCopyModal(false); setCopyMessage(''); }}>✕</button>
-            </div>
-            <div style={s.modalBody}>
-              <div style={s.presetInfoBox}>
-                <strong>Fitur Jadwal Copy</strong>
-                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.78rem', lineHeight: 1.8 }}>
-                  <li><strong>Buat Copy Jadwal:</strong> Membuat snapshot jadwal saat ini untuk dosen</li>
-                  <li><strong>Save Perubahan:</strong> Menyinkronkan perubahan jadwal ke copy</li>
-                  <li>Dosen akan melihat copy di dashboard mereka dengan pilihan Daring/Luring</li>
-                </ul>
-              </div>
-              {copyMessage && (
-                <div style={{ padding: '0.75rem 1rem', background: '#e8f5e9', borderRadius: '8px', color: '#2e7d32', fontSize: '0.875rem', marginTop: '1rem' }}>
-                  ✓ {copyMessage}
-                </div>
-              )}
-              <div style={s.modalFooter}>
-                <button onClick={() => { setShowCreateCopyModal(false); setCopyMessage(''); }} disabled={copyOperationPending} style={copyOperationPending ? s.btnGrayDisabled : s.btnGray}>
-                  Tutup
-                </button>
-                <button onClick={handleCreateJadwalCopy} disabled={copyOperationPending} style={copyOperationPending ? s.btnGrayDisabled : s.btnPrimary}>
-                  {copyOperationPending ? 'Memproses...' : '📋 Buat Copy Jadwal'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Preferensi Dosen Modal ── */}
       {showPreferenceModal && selectedDosenForPref && (
         <div style={s.overlay} onClick={() => setShowPreferenceModal(false)}>
@@ -1297,7 +1089,7 @@ export default function JadwalPage() {
                 <div style={s.errRed}>
                   <strong>⚠️ Belum ada preset jadwal</strong>
                   <br />
-                  <small>Silakan buat preset terlebih dahulu di bagian Jadwal Copy</small>
+                  <small>Silakan buat preset jadwal terlebih dahulu</small>
                 </div>
               )}
 

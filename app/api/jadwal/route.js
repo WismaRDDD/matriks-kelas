@@ -30,6 +30,8 @@ export async function GET(req) {
         'jadwal.semester',
         'jadwal.sks',
         'jadwal.lantai',
+        'jadwal.learning_type',
+        'jadwal.learning_time',
         'jadwal.created_at',
         'jadwal.updated_at',
         'kelas.nama_kelas',
@@ -232,6 +234,9 @@ export async function PUT(req) {
     if (body.jam_mulai) updateData.jam_mulai = body.jam_mulai;
     if (body.jam_selesai) updateData.jam_selesai = body.jam_selesai;
     if (body.dosen_id !== undefined) updateData.dosen_id = body.dosen_id;
+    // Support learning_type dan learning_time untuk dosen
+    if (body.learning_type !== undefined) updateData.learning_type = body.learning_type;
+    if (body.learning_time !== undefined) updateData.learning_time = body.learning_time;
     // Note: semester should come from kurikulum.f_semester, not directly from body
     
     // Jika ada perubahan kelas_id, ambil data kelas terbaru
