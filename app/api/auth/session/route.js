@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth/session';
+import { decodeSessionValue, getSession } from '@/lib/auth/session';
 
 // Helper untuk parse cookie dari header
 function parseCookieHeader(cookieHeader) {
@@ -28,8 +28,7 @@ export async function GET(req) {
       
       if (cookies.session) {
         try {
-          const decoded = Buffer.from(cookies.session, 'base64').toString('utf-8');
-          session = JSON.parse(decoded);
+          session = decodeSessionValue(cookies.session);
         } catch (err) {
           console.error('Failed to parse session cookie:', err);
         }
@@ -37,10 +36,17 @@ export async function GET(req) {
     }
     
     if (!session) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { authenticated: false },
         { status: 401 }
       );
+
+      response.headers.append(
+        'Set-Cookie',
+        'session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+      );
+
+      return response;
     }
 
     return NextResponse.json({

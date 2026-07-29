@@ -43,8 +43,7 @@ export default function JadwalPage() {
   const [ruanganList, setRuanganList] = useState([]);
   const [editingSession, setEditingSession] = useState(null);
   const [showAutoGenModal, setShowAutoGenModal] = useState(false);
-  const [autoGenSettings, setAutoGenSettings] = useState({ fillEmptyOnly: true, usePreferences: true });
-  const [databasePresets, setDatabasePresets] = useState([]);
+  const [autoGenSettings, setAutoGenSettings] = useState({ fillEmptyOnly: true, mode: 'preferensi' });
   const [tahunAkademikList, setTahunAkademikList] = useState([]);
   const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('Gasal');
@@ -54,6 +53,9 @@ export default function JadwalPage() {
   const [preferences, setPreferences] = useState({});
   const [floorPreferences, setFloorPreferences] = useState({ 1: true, 2: true, 3: true, 4: true });
   const [databasePresetsList, setDatabasePresetsList] = useState([]);
+  const [customPreferenceByDosenId, setCustomPreferenceByDosenId] = useState({});
+  const [scheduleSearch, setScheduleSearch] = useState('');
+  const [selectedProdiFilter, setSelectedProdiFilter] = useState('ALL');
 
   const tableRef = useRef(null);
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -93,7 +95,8 @@ export default function JadwalPage() {
       const uniqueKelas = Array.from(new Map((Array.isArray(kelas) ? kelas : []).map(k => [k.id, k])).values());
       setKelasList(uniqueKelas);
       setRuanganList(Array.isArray(ruangan) ? ruangan : []);
-      setDosenList(Array.isArray(dosen) ? dosen : []);
+      const safeDosenList = Array.isArray(dosen) ? dosen : [];
+      setDosenList(safeDosenList);
       setDatabasePresetsList(Array.isArray(presets) ? presets : []);
       const organizedJadwal = {};
       days.forEach((day) => { organizedJadwal[day] = {}; });
@@ -104,9 +107,10 @@ export default function JadwalPage() {
         organizedJadwal[j.hari][j.ruangan_id].push(j);
       });
       setJadwalData(organizedJadwal);
+      await loadCustomPreferenceIndicators(safeDosenList);
     } catch {
       showMessage('error', 'Error loading data. Please try again.');
-      setKelasList([]); setRuanganList([]); setDosenList([]); setDatabasePresetsList([]);
+      setKelasList([]); setRuanganList([]); setDosenList([]); setDatabasePresetsList([]); setCustomPreferenceByDosenId({});
     } finally { setLoading(false); }
   };
 
@@ -267,6 +271,13 @@ export default function JadwalPage() {
       }
 
       showMessage('success', `✅ Preferensi ${selectedDosenForPref.f_namapegawai} berhasil disimpan`);
+      if (selectedDosenForPref?.id) {
+        const profile = await getDosenPreferenceProfile(selectedDosenForPref.id);
+        setCustomPreferenceByDosenId((prev) => ({
+          ...prev,
+          [selectedDosenForPref.id]: Boolean(profile.isCustom),
+        }));
+      }
       setShowPreferenceModal(false);
     } catch (err) {
       console.error('Error saving preferences:', err);
@@ -344,6 +355,173 @@ export default function JadwalPage() {
   const isSessionCutByBreak = (hari, jamMulai, jamSelesai, sks = 1) => { if (sks < 2) return false; const breakTimes = getBreakTimes(hari); const breakStartMin = timeToMinutes(breakTimes.mulai); const breakEndMin = timeToMinutes(breakTimes.selesai); const sessionStartMin = timeToMinutes(jamMulai); const sessionEndMin = timeToMinutes(jamSelesai); return sessionStartMin < breakEndMin && sessionEndMin > breakStartMin; };
   const findOverlappingSession = (hari, ruanganId, jamMulai, jamSelesai) => { const dayData = jadwalData[hari] || {}; const sessionsInRuangan = dayData[parseInt(ruanganId)] || []; const newStart = timeToMinutes(jamMulai); const newEnd = timeToMinutes(jamSelesai); const semesterNumbers = getSemesterNumbersForComparison(selectedSemester); for (const existingSession of sessionsInRuangan) { if (!semesterNumbers.includes(Number(existingSession.semester))) continue; if (editingSession && existingSession.id === editingSession.id) continue; const existingStart = timeToMinutes(existingSession.jam_mulai); const existingEnd = timeToMinutes(existingSession.jam_selesai); if (newStart < existingEnd && newEnd > existingStart) return { found: true, conflictName: existingSession.display_name, conflictTime: `${existingSession.jam_mulai}-${existingSession.jam_selesai}` }; } return { found: false }; }
 
+  const buildDefaultAvailabilityGrid = () => {
+    const defaultGrid = {};
+    days.forEach((day, index) => {
+      defaultGrid[day] = {};
+      const sessions = generateTimeSlots(day);
+      sessions.forEach((slot) => {
+        if (slot.isBreak) return;
+        defaultGrid[day][`${slot.start}-${slot.end}`] = index !== 5;
+      });
+    });
+    return defaultGrid;
+  };
+
+  const shuffleArray = (items) => {
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  const getDosenPreferenceProfile = async (dosenId) => {
+    const defaultGrid = buildDefaultAvailabilityGrid();
+    const defaultFloors = { 1: true, 2: true, 3: true, 4: true };
+
+    try {
+      const res = await fetch(`/api/dosen/preferences?dosenId=${dosenId}`);
+      if (!res.ok) {
+        return { isCustom: false, preferredDays: days, preferredFloors: [1, 2, 3, 4], availability: defaultGrid };
+      }
+
+      const prefs = await res.json();
+      const availability = JSON.parse(JSON.stringify(defaultGrid));
+      const floorPref = Array.isArray(prefs) && prefs.length > 0 ? (prefs[0]?.dosen_prefer_lantai || '1,2,3,4') : '1,2,3,4';
+      const floorNumbers = floorPref.split(',').map((item) => parseInt(item.trim(), 10)).filter((item) => !Number.isNaN(item));
+      const preferredFloors = floorNumbers.length > 0 ? floorNumbers : [1, 2, 3, 4];
+
+      prefs.forEach((pref) => {
+        if (availability[pref.hari] && availability[pref.hari][pref.sesi] !== undefined) {
+          availability[pref.hari][pref.sesi] = Boolean(pref.is_available);
+        }
+      });
+
+      const customDayKeys = days.filter((day) => {
+        const daySessions = Object.keys(availability[day] || {});
+        return daySessions.some((session) => availability[day][session] !== defaultGrid[day][session]);
+      });
+
+      const hasCustomFloors = Object.keys(defaultFloors).some((floor) => {
+        const floorNumber = Number(floor);
+        return Boolean(defaultFloors[floorNumber]) !== preferredFloors.includes(floorNumber);
+      });
+
+      return {
+        isCustom: customDayKeys.length > 0 || hasCustomFloors,
+        preferredDays: customDayKeys.length > 0 ? customDayKeys : days,
+        preferredFloors,
+        availability,
+      };
+    } catch (err) {
+      console.warn('Could not fetch dosen preference profile:', err);
+      return { isCustom: false, preferredDays: days, preferredFloors: [1, 2, 3, 4], availability: defaultGrid };
+    }
+  };
+
+  const getAutoGenCandidateSlots = (kelas, profile) => {
+    const sks = Number(kelas?.sks || kelas?.f_sks_kurikulum || 1);
+    const preferredFloors = profile?.preferredFloors || [1, 2, 3, 4];
+    const preferredDays = Array.isArray(profile?.preferredDays) ? profile.preferredDays : days;
+    const rooms = ruanganList.filter((ruangan) => preferredFloors.includes(Number(ruangan.f_lantai)));
+    const candidates = [];
+
+    preferredDays.forEach((day) => {
+      const timeSlots = generateTimeSlots(day);
+      timeSlots.forEach((slot) => {
+        if (slot.isBreak) return;
+
+        const jamSelesai = calculateJamSelesai(slot.start, sks);
+        if (timeToMinutes(jamSelesai) > timeToMinutes(settings.jamSelesai)) return;
+        if (sks >= 2 && isSessionCutByBreak(day, slot.start, jamSelesai, sks)) return;
+
+        rooms.forEach((ruangan) => {
+          if (isSlotOccupied(day, ruangan.id, slot.start, jamSelesai)) return;
+
+          const sessionKey = `${slot.start}-${slot.end}`;
+          const isAvailable = profile?.availability?.[day]?.[sessionKey];
+          if (profile?.isCustom && isAvailable === false) return;
+
+          candidates.push({
+            hari: day,
+            ruangan_id: ruangan.id,
+            jam_mulai: slot.start,
+            jam_selesai: jamSelesai,
+          });
+        });
+      });
+    });
+
+    return shuffleArray(candidates);
+  };
+
+  const loadCustomPreferenceIndicators = async (dosenItems) => {
+    if (!Array.isArray(dosenItems) || dosenItems.length === 0) {
+      setCustomPreferenceByDosenId({});
+      return;
+    }
+
+    try {
+      const profiles = await Promise.all(
+        dosenItems.map(async (dosen) => {
+          const profile = await getDosenPreferenceProfile(dosen.id);
+          return [dosen.id, Boolean(profile.isCustom)];
+        })
+      );
+
+      setCustomPreferenceByDosenId(Object.fromEntries(profiles));
+    } catch (error) {
+      console.warn('Failed to load custom preference indicators:', error);
+      setCustomPreferenceByDosenId({});
+    }
+  };
+
+  const normalizeText = (value) => String(value || '').toLowerCase().trim();
+
+  const getSessionContext = (session) => {
+    const kelas = kelasList.find((k) => Number(k.id) === Number(session.kelas_id));
+    const dosenById = session.dosen_id ? dosenList.find((d) => Number(d.id) === Number(session.dosen_id)) : null;
+    const dosenByKelas = kelas?.dosen
+      ? dosenList.find((d) => normalizeText(d.f_namapegawai) === normalizeText(kelas.dosen))
+      : null;
+    const dosenBySession = session.nama_dosen_db
+      ? dosenList.find((d) => normalizeText(d.f_namapegawai) === normalizeText(session.nama_dosen_db))
+      : null;
+
+    const dosen = dosenById || dosenByKelas || dosenBySession || null;
+    const dosenName = dosen?.f_namapegawai || session.nama_dosen_db || session.nama_dosen || kelas?.dosen || '';
+    const nidn = dosen?.f_nidn || '';
+    const prodiId = dosen?.f_progdi_id || '';
+    const mataKuliah = session.nama_matakuliah || session.nama_mk || session.display_name || kelas?.display_name || kelas?.nama_kelas || '';
+
+    return {
+      dosenName,
+      nidn,
+      prodiId,
+      mataKuliah,
+      isCustomPreference: dosen?.id ? Boolean(customPreferenceByDosenId[dosen.id]) : false,
+    };
+  };
+
+  const isSessionVisibleByFilters = (session) => {
+    const searchKeyword = normalizeText(scheduleSearch);
+    const { dosenName, nidn, mataKuliah, prodiId } = getSessionContext(session);
+
+    if (selectedProdiFilter !== 'ALL' && normalizeText(prodiId) !== normalizeText(selectedProdiFilter)) {
+      return false;
+    }
+
+    if (!searchKeyword) {
+      return true;
+    }
+
+    return [dosenName, nidn, mataKuliah, session.display_name]
+      .map((item) => normalizeText(item))
+      .some((item) => item.includes(searchKeyword));
+  };
+
   const hasFormData = () => {
     return sessionInput.trim().length > 0 || selectedKelas !== null;
   };
@@ -413,7 +591,7 @@ export default function JadwalPage() {
                 dosenId = dosenList[0].id;
               }
             }
-          } catch (err) {
+          } catch {
             console.warn('Could not find dosen by NIDN:', kelas.dosen);
           }
         }
@@ -442,24 +620,106 @@ export default function JadwalPage() {
 
   const generateScheduleAuto = async () => {
     try {
-      const dosenRes = await fetch('/api/dosen'); const dosenRaw = await dosenRes.json(); const dosenList = Array.isArray(dosenRaw) ? dosenRaw : [];
-      const dosenWithLevel = dosenList.map((d) => { let level = 0; if (d.prefer_hari) level += 3; if (d.prefer_jam_mulai) level += 2; if (d.prefer_lantai) level += 1; return { ...d, preferenceLevel: level }; });
-      dosenWithLevel.sort((a, b) => b.preferenceLevel - a.preferenceLevel);
       const semesterNumbers = getSemesterNumbersForComparison(selectedSemester);
-      const emptyKelas = kelasList.filter((k) => { const hasSchedule = days.some((day) => jadwalData[day] && Object.values(jadwalData[day]).some((arr) => arr.some((j) => j.kelas_id === k.id && semesterNumbers.includes(Number(j.semester))))); return !hasSchedule; });
-      let generated = 0;
-      for (const kelas of emptyKelas) {
-        const preferredDosen = dosenWithLevel[generated % Math.max(dosenWithLevel.length, 1)];
-        const hari = autoGenSettings.usePreferences && preferredDosen?.prefer_hari ? preferredDosen.prefer_hari.split(',')[0].trim() : days[generated % 5];
-        let ruangan = ruanganList[generated % Math.max(ruanganList.length, 1)];
-        if (autoGenSettings.usePreferences && preferredDosen?.prefer_lantai) { const preferredRuangan = ruanganList.find((r) => r.f_lantai === parseInt(preferredDosen.prefer_lantai)); ruangan = preferredRuangan || ruangan; }
-        if (!ruangan) continue;
-        const jadwalPayload = { kelas_id: kelas.id, hari, ruangan_id: ruangan.id, jam_mulai: preferredDosen?.prefer_jam_mulai || '07:00', jam_selesai: preferredDosen?.prefer_jam_selesai || '12:00', dosen_id: preferredDosen?.id, display_name: kelas.display_name || kelas.nama_kelas, semester: selectedSemester };
-        const res = await fetch('/api/jadwal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(jadwalPayload) });
-        if (res.ok) generated++;
+      const emptyKelas = kelasList.filter((k) => {
+        const hasSchedule = days.some((day) => {
+          const dayData = jadwalData[day] || {};
+          return Object.values(dayData).some((arr) => arr.some((j) => j.kelas_id === k.id && semesterNumbers.includes(Number(j.semester))));
+        });
+        return !hasSchedule;
+      });
+
+      if (emptyKelas.length === 0) {
+        showMessage('success', 'Tidak ada kelas yang perlu di-generate');
+        setShowAutoGenModal(false);
+        return;
       }
-      showMessage('success', `${generated} sesi berhasil dibuat otomatis`); setShowAutoGenModal(false); await fetchData();
-    } catch (err) { showMessage('error', `Error generating schedule: ${err.message}`); }
+
+      const randomize = (items) => shuffleArray(items);
+      const kelasListForAutoGen = randomize(emptyKelas);
+      const customFirstKelas = [];
+      const defaultKelas = [];
+
+      for (const kelas of kelasListForAutoGen) {
+        const kelasDosenNidn = kelas?.dosen;
+        let profile = { isCustom: false, preferredDays: days, preferredFloors: [1, 2, 3, 4], availability: buildDefaultAvailabilityGrid() };
+
+        if (autoGenSettings.mode === 'preferensi' && kelasDosenNidn) {
+          const dosenRes = await fetch(`/api/dosen?nidn=${encodeURIComponent(kelasDosenNidn)}`);
+          if (dosenRes.ok) {
+            const dosenMatches = await dosenRes.json();
+            const dosen = Array.isArray(dosenMatches) ? dosenMatches[0] : null;
+            if (dosen?.id) {
+              profile = await getDosenPreferenceProfile(dosen.id);
+            }
+          }
+        }
+
+        if (autoGenSettings.mode === 'preferensi' && profile.isCustom) {
+          customFirstKelas.push({ kelas, profile });
+        } else {
+          defaultKelas.push({ kelas, profile });
+        }
+      }
+
+      const orderedKelas = [...shuffleArray(customFirstKelas), ...shuffleArray(defaultKelas)];
+      let generated = 0;
+
+      for (const { kelas, profile } of orderedKelas) {
+        const sks = Number(kelas?.sks || kelas?.f_sks_kurikulum || 1);
+        let candidates = [];
+
+        if (autoGenSettings.mode === 'preferensi') {
+          candidates = getAutoGenCandidateSlots(kelas, profile);
+        } else {
+          const rooms = ruanganList.length > 0 ? ruanganList : [];
+          candidates = shuffleArray(days.flatMap((day) => {
+            const timeSlots = generateTimeSlots(day);
+            return timeSlots.flatMap((slot) => {
+              if (slot.isBreak) return [];
+              const jamSelesai = calculateJamSelesai(slot.start, sks);
+              if (timeToMinutes(jamSelesai) > timeToMinutes(settings.jamSelesai)) return [];
+              if (sks >= 2 && isSessionCutByBreak(day, slot.start, jamSelesai, sks)) return [];
+              return rooms.flatMap((ruangan) => {
+                if (isSlotOccupied(day, ruangan.id, slot.start, jamSelesai)) return [];
+                return [{ hari: day, ruangan_id: ruangan.id, jam_mulai: slot.start, jam_selesai: jamSelesai }];
+              });
+            });
+          }));
+        }
+
+        if (candidates.length === 0) {
+          continue;
+        }
+
+        const candidate = candidates[0];
+        const jadwalPayload = {
+          kelas_id: kelas.id,
+          hari: candidate.hari,
+          ruangan_id: candidate.ruangan_id,
+          jam_mulai: candidate.jam_mulai,
+          jam_selesai: candidate.jam_selesai,
+          display_name: kelas.display_name || kelas.nama_kelas,
+          semester: selectedSemester,
+        };
+
+        const res = await fetch('/api/jadwal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(jadwalPayload),
+        });
+
+        if (res.ok) {
+          generated += 1;
+        }
+      }
+
+      showMessage('success', `${generated} sesi berhasil dibuat otomatis`);
+      setShowAutoGenModal(false);
+      await fetchData();
+    } catch (err) {
+      showMessage('error', `Error generating schedule: ${err.message}`);
+    }
   };
 
   const exportToXLSX = () => {
@@ -519,6 +779,7 @@ export default function JadwalPage() {
     // Filter strips
     filterStrip: { padding: '1rem 1.25rem', backgroundColor: '#f3e5f5', borderRadius: '10px', borderLeft: '4px solid #7b1fa2', marginBottom: '1.25rem' },
     subFilterStrip: { padding: '1rem 1.25rem', backgroundColor: '#fafbff', borderRadius: '10px', border: '1px solid #e8eaf6', marginBottom: '1.25rem' },
+    searchHint: { display: 'block', marginTop: '0.5rem', fontSize: '0.75rem', color: '#607d8b' },
     // Modal
     overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(30,10,50,0.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
     modalBox: { backgroundColor: 'white', borderRadius: '14px', maxWidth: '480px', width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' },
@@ -535,6 +796,7 @@ export default function JadwalPage() {
     // Table cells
     cellBreak: { backgroundColor: '#ef9a9a', textAlign: 'center', padding: '0.5rem', fontSize: '0.72rem', fontWeight: 700, color: '#b71c1c', position: 'relative', border: '1px solid #e57373' },
     cellOccupied: { backgroundColor: '#e8f5e9', padding: '0.25rem', fontSize: '0.72rem', position: 'relative', border: '1px solid #c8e6c9', cursor: 'pointer', textAlign: 'center', verticalAlign: 'middle' },
+    customPreferenceBadge: { display: 'inline-block', backgroundColor: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80', borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.6rem', fontWeight: 700 },
     cellEmpty: { backgroundColor: 'white', padding: '0.25rem', border: '1px solid #f0f2ff', textAlign: 'center', verticalAlign: 'middle', cursor: 'pointer' },
     cellBtnEdit: { fontSize: '0.65rem', backgroundColor: '#7b1fa2', color: 'white', border: 'none', borderRadius: '4px', padding: '0.15rem 0.4rem', cursor: 'pointer', marginRight: '0.2rem' },
     cellBtnDel: { fontSize: '0.65rem', backgroundColor: '#e53935', color: 'white', border: 'none', borderRadius: '4px', padding: '0.15rem 0.4rem', cursor: 'pointer' },
@@ -686,7 +948,9 @@ export default function JadwalPage() {
                     >
                       <option value="">Pilih dosen</option>
                       {dosenList.map(d => (
-                        <option key={d.id} value={d.id}>{d.f_namapegawai}</option>
+                        <option key={d.id} value={d.id}>
+                          {d.f_namapegawai} {customPreferenceByDosenId[d.id] ? '• Custom' : '• Default'}
+                        </option>
                       ))}
                     </select>
                   )}
@@ -767,6 +1031,28 @@ export default function JadwalPage() {
 
         {/* ── Schedule Matrix ── */}
         <div style={s.card}>
+                      <div style={s.subFilterStrip}>
+              <label style={s.label}>🔎 Search Sesi (Dosen / NIDN / Mata Kuliah)</label>
+              <input
+                type="text"
+                value={scheduleSearch}
+                onChange={(e) => setScheduleSearch(e.target.value)}
+                placeholder="Contoh: Budi, 0011223344, Algoritma"
+                style={s.input}
+              />
+              <small style={s.searchHint}>Saat diisi, matriks hanya menampilkan sesi yang cocok dengan keyword.</small>
+            </div>
+
+            <div style={s.subFilterStrip}>
+              <label style={s.label}>🏷️ Filter Prodi ID</label>
+              <select value={selectedProdiFilter} onChange={(e) => setSelectedProdiFilter(e.target.value)} style={s.select}>
+                <option value="ALL">Default - Semua Prodi</option>
+                {Array.from(new Set(dosenList.map((d) => (d.f_progdi_id || '').trim()).filter(Boolean))).sort().map((prodiId) => (
+                  <option key={prodiId} value={prodiId}>{prodiId}</option>
+                ))}
+              </select>
+            </div>
+
           <div style={s.cardHeader}>
             <h3 style={s.cardHeaderText}>📋 Matriks Jadwal Kuliah</h3>
           </div>
@@ -775,7 +1061,16 @@ export default function JadwalPage() {
               if (!visibleDays[day]) return null;
               const dayData = jadwalData[day] || {};
               const timeSlots = generateTimeSlots(day);
-              const totalSesi = Object.values(dayData).flat().length;
+              const semesterNumbers = getSemesterNumbersForComparison(selectedSemester);
+              const filteredDayData = {};
+              Object.entries(dayData).forEach(([ruanganId, sessions]) => {
+                filteredDayData[ruanganId] = (sessions || []).filter((session) => {
+                  if (!semesterNumbers.includes(Number(session.semester))) return false;
+                  return isSessionVisibleByFilters(session);
+                });
+              });
+              const totalSesi = Object.values(filteredDayData).flat().length;
+              const hasActiveDisplayFilter = normalizeText(scheduleSearch).length > 0 || selectedProdiFilter !== 'ALL';
 
               return (
                 <div key={day} style={{ marginBottom: '2rem' }}>
@@ -802,11 +1097,10 @@ export default function JadwalPage() {
                               {ruangan.f_namaruang}
                             </td>
                             {timeSlots.map((slot, idx) => {
-                              const semesterNumbers = getSemesterNumbersForComparison(selectedSemester);
-                              const sessions = (dayData[ruangan.id] || []).filter((s) => semesterNumbers.includes(Number(s.semester)));
+                              const sessions = filteredDayData[ruangan.id] || [];
                               const sessionInSlot = sessions.find((s) => s.jam_mulai === slot.start && s.jam_selesai === slot.end);
-                              const isOccupied = isSlotOccupied(day, ruangan.id, slot.start, slot.end);
                               const occupyingSession = sessions.find((s) => { const ss = timeToMinutes(s.jam_mulai); const se = timeToMinutes(s.jam_selesai); const ts = timeToMinutes(slot.start); const te = timeToMinutes(slot.end); return ss < te && se > ts; });
+                              const isOccupied = Boolean(occupyingSession);
 
                               const openEditModal = (session) => {
                                 setEditingSession(session); setSelectedHari(day); setSelectedRuangan(ruangan.id);
@@ -823,6 +1117,9 @@ export default function JadwalPage() {
                                 <td key={idx} style={s.cellOccupied}>
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', height: '100%', justifyContent: 'center' }}>
                                     <span style={{ fontWeight: 700, color: '#2e7d32', fontSize: '0.7rem', textAlign: 'center', lineHeight: 1.3 }}>{sessionInSlot.display_name}</span>
+                                    {getSessionContext(sessionInSlot).isCustomPreference && (
+                                      <span style={s.customPreferenceBadge}>Custom Pref</span>
+                                    )}
                                     <div style={{ display: 'flex', gap: '0.2rem' }}>
                                       <button onClick={() => openEditModal(sessionInSlot)} style={s.cellBtnEdit}>Edit</button>
                                       <button onClick={() => handleDeleteSession(sessionInSlot.id)} style={s.cellBtnDel}>Hapus</button>
@@ -834,6 +1131,9 @@ export default function JadwalPage() {
                                 <td key={idx} style={{ ...s.cellOccupied, backgroundColor: '#f3e5f5', border: '1px solid #e1bee7' }} onClick={() => openEditModal(occupyingSession)}>
                                   <span style={{ fontSize: '0.65rem', color: '#7b1fa2', fontStyle: 'italic', opacity: 0.75 }}>({occupyingSession.display_name})</span>
                                 </td>
+                              );
+                              if (hasActiveDisplayFilter) return (
+                                <td key={idx} style={s.cellEmpty} />
                               );
                               return (
                                 <td key={idx} style={s.cellEmpty}>
@@ -946,14 +1246,27 @@ export default function JadwalPage() {
             </div>
             <div style={s.modalBody}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                {[{ key: 'fillEmptyOnly', label: 'Isi hanya kelas yang belum dijadwalkan' }, { key: 'usePreferences', label: 'Gunakan preferensi dosen' }].map(({ key, label }) => (
-                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f' }}>
-                    <input type="checkbox" checked={autoGenSettings[key]} onChange={(e) => setAutoGenSettings({ ...autoGenSettings, [key]: e.target.checked })} style={{ accentColor: '#7b1fa2' }} />
-                    {label}
-                  </label>
-                ))}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f' }}>
+                  <input type="checkbox" checked={autoGenSettings.fillEmptyOnly} onChange={(e) => setAutoGenSettings({ ...autoGenSettings, fillEmptyOnly: e.target.checked })} style={{ accentColor: '#7b1fa2' }} />
+                  Isi hanya kelas yang belum dijadwalkan
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mode Generate</span>
+                  {['normal', 'preferensi'].map((mode) => (
+                    <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f' }}>
+                      <input
+                        type="radio"
+                        name="autoGenMode"
+                        checked={autoGenSettings.mode === mode}
+                        onChange={() => setAutoGenSettings({ ...autoGenSettings, mode })}
+                        style={{ accentColor: '#7b1fa2' }}
+                      />
+                      {mode === 'normal' ? 'Generate normal' : 'Generate dengan preferensi dosen'}
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div style={s.infoBlue}>Sistem akan membuat jadwal berdasarkan preferensi dosen dan ketersediaan ruangan.</div>
+              <div style={s.infoBlue}>Mode preferensi akan mengisi kelas dengan preferensi custom dulu, lalu sisanya menggunakan fallback default dosen.</div>
               <div style={s.modalFooter}>
                 <button onClick={() => setShowAutoGenModal(false)} style={s.btnGray}>Batal</button>
                 <button onClick={generateScheduleAuto} style={s.btnPurple}>Generate</button>

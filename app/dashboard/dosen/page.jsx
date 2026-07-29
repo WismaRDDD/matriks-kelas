@@ -8,7 +8,6 @@ export default function DosenPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
   const [messagePopup, setMessagePopup] = useState({ show: false, type: '', text: '' });
   const [importStats, setImportStats] = useState({ show: false, success: 0, duplicate: 0, failed: 0 });
 
@@ -36,20 +35,30 @@ export default function DosenPage() {
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
+  const defaultDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const defaultFloorPreference = { 1: true, 2: true, 3: true, 4: true };
 
   // Fetch Data
   const fetchData = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/dosen');
-      const json = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json') ? await res.json() : null;
 
-      json.sort((a, b) => new Date(a.f_tanggallahir) - new Date(b.f_tanggallahir));
+      if (!res.ok) {
+        const apiError = payload?.error || `HTTP ${res.status}`;
+        throw new Error(apiError);
+      }
 
-      setData(json);
+      const safeData = Array.isArray(payload) ? payload : [];
+      safeData.sort((a, b) => new Date(a.f_tanggallahir) - new Date(b.f_tanggallahir));
+
+      setData(safeData);
       setSelectedIds([]);
-    } catch {
-      showMessage('error', 'Gagal memuat data dosen');
+    } catch (error) {
+      setData([]);
+      showMessage('error', `Gagal memuat data dosen: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -201,23 +210,55 @@ export default function DosenPage() {
     setShowForm(true);
   };
 
-  const handleEditPreference = async (data) => {
-    setForm({ id: data.id, f_namapegawai: data.f_namapegawai });
-    
-    // Initialize preferences grid - default all checked except Saturday (day 5)
-    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const buildDefaultPreferences = () => {
     const newPreferences = {};
-    days.forEach((day, index) => {
+
+    defaultDays.forEach((day, index) => {
       newPreferences[day] = {};
-      presets.forEach((preset) => {
-        // Generate sessions for this specific day (considering break times)
-        const sessions = generateSessions(preset.jam_mulai, preset.jam_selesai, preset.durasi_slot, preset, day);
-        sessions.forEach((session) => {
-          // Default: all checked except Saturday
-          newPreferences[day][session] = index !== 5;
-        });
+
+      const activePreset = presets[0];
+      if (!activePreset?.jam_mulai || !activePreset?.jam_selesai || !activePreset?.durasi_slot) {
+        return;
+      }
+
+      const sessions = generateSessions(
+        activePreset.jam_mulai,
+        activePreset.jam_selesai,
+        activePreset.durasi_slot,
+        activePreset,
+        day,
+      );
+
+      sessions.forEach((session) => {
+        newPreferences[day][session] = index !== 5;
       });
     });
+
+    return newPreferences;
+  };
+
+  const isDefaultPreferenceState = () => {
+    const defaultPreferences = buildDefaultPreferences();
+    const hasSameSessions = defaultDays.every((day) =>
+      Object.keys(defaultPreferences[day] || {}).every((session) => preferences[day]?.[session] === defaultPreferences[day][session])
+    );
+
+    const hasSameFloors = Object.keys(defaultFloorPreference).every((floor) => floorPreferences[floor] === defaultFloorPreference[floor]);
+
+    return hasSameSessions && hasSameFloors;
+  };
+
+  const handleResetPreferences = () => {
+    const resetPreferences = buildDefaultPreferences();
+    setPreferences(resetPreferences);
+    setFloorPreferences({ ...defaultFloorPreference });
+    showMessage('success', 'Preferensi berhasil dikembalikan ke default');
+  };
+
+  const handleEditPreference = async (data) => {
+    setForm({ id: data.id, f_namapegawai: data.f_namapegawai });
+
+    const newPreferences = buildDefaultPreferences();
 
     // Load existing preferences
     try {
@@ -230,22 +271,22 @@ export default function DosenPage() {
               newPreferences[pref.hari][pref.sesi] = pref.is_available;
             }
           });
-          
+
           // Load floor preferences if exists
           const dosenWithFloors = existingPrefs[0]?.dosen_prefer_lantai;
           if (dosenWithFloors) {
             const floorsArray = dosenWithFloors.split(',').map(f => parseInt(f.trim()));
             setFloorPreferences({ 1: floorsArray.includes(1), 2: floorsArray.includes(2), 3: floorsArray.includes(3), 4: floorsArray.includes(4) });
           } else {
-            setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+            setFloorPreferences({ ...defaultFloorPreference });
           }
         } else {
-          setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+          setFloorPreferences({ ...defaultFloorPreference });
         }
       }
     } catch (err) {
       console.error('Error loading preferences:', err);
-      setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
+      setFloorPreferences({ ...defaultFloorPreference });
     }
 
     setPreferences(newPreferences);
@@ -953,7 +994,12 @@ export default function DosenPage() {
       {showPreferenceForm && (
         <div style={styles.modal} onClick={() => setShowPreferenceForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>📅 Preferensi Dosen - {form.f_namapegawai}</h3>
+            <div style={styles.modalTitleRow}>
+              <h3 style={styles.modalTitle}>📅 Preferensi Dosen - {form.f_namapegawai}</h3>
+              <span style={isDefaultPreferenceState() ? styles.statusBadgeDefault : styles.statusBadgeCustom}>
+                {isDefaultPreferenceState() ? 'Default' : 'Custom'}
+              </span>
+            </div>
 
             {presets.length > 0 && presets[0]?.jam_mulai ? (
               <>
@@ -1078,6 +1124,9 @@ export default function DosenPage() {
             )}
 
             <div style={styles.modalActions}>
+              <button style={styles.btnSecondary} onClick={handleResetPreferences}>
+                ↺ Reset ke Default
+              </button>
               <button style={styles.btnPrimary} onClick={handleSavePreference} disabled={presets.length === 0}>
                 💾 Simpan
               </button>
@@ -1494,11 +1543,37 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  modalTitleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    marginBottom: '1rem',
+    flexWrap: 'wrap',
+  },
   modalTitle: {
     fontSize: '1.2rem',
     fontWeight: '700',
     color: '#000000',
     margin: 0,
+  },
+  statusBadgeDefault: {
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
+    borderRadius: '999px',
+    padding: '0.35rem 0.75rem',
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    border: '1px solid #a5d6a7',
+  },
+  statusBadgeCustom: {
+    backgroundColor: '#fff3e0',
+    color: '#e65100',
+    borderRadius: '999px',
+    padding: '0.35rem 0.75rem',
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    border: '1px solid #ffcc80',
   },
   modalCloseBtn: {
     background: 'rgba(255,255,255,0.2)',
