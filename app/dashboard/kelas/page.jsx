@@ -20,7 +20,7 @@ export default function KelasPage() {
   const [editingDosenSearch, setEditingDosenSearch] = useState('');
   const [showDosenDropdown, setShowDosenDropdown] = useState(false);
   const [searchKeywordView, setSearchKeywordView] = useState('');
-  
+
   // Filter states
   const [tahunAkademikList, setTahunAkademikList] = useState([]);
   const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
@@ -69,7 +69,6 @@ export default function KelasPage() {
       const res = await fetch('/api/kelas');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      console.log('📊 Data kelas:', data); // Debug: lihat data yang diterima
       setKelasBaru(data);
     } catch (err) {
       console.error('❌ Fetch kelas error:', err);
@@ -92,8 +91,7 @@ export default function KelasPage() {
       const res = await fetch('/api/kurikulum-master');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // Filter by tahun akademik
-      const filtered = tahunId 
+      const filtered = tahunId
         ? data.filter(k => String(k.f_tahun_akademik) === String(tahunId))
         : data;
       setKurikulumMasterList(filtered);
@@ -129,14 +127,14 @@ export default function KelasPage() {
       setSelectedMatkul(null);
       return;
     }
-    
+
     const mk = matkul.find(m => m.id == id);
     setSelectedMatkul(mk);
     setSearchMatkul(`${mk.f_kodemk} - ${mk.f_namamk}`);
     setShowDropdown(false);
 
     const existingClasses = kelasBaru.filter(
-      k => k.f_matkul_id === mk.id && 
+      k => k.f_matkul_id === mk.id &&
            k.f_kurikulum === selectedKurikulumId
     );
 
@@ -152,28 +150,25 @@ export default function KelasPage() {
 
   const getNextClassName = () => {
     if (kelasList.length === 0) return 'A';
-    
-    // Get all existing class codes
+
     const existingCodes = new Set(kelasList.map(k => k.nama.charCodeAt(0)));
-    
-    // Find first gap starting from 'A' (65)
-    for (let code = 65; code <= 90; code++) { // A to Z
+
+    for (let code = 65; code <= 90; code++) {
       if (!existingCodes.has(code)) {
         return String.fromCharCode(code);
       }
     }
-    
-    // If all A-Z are taken, return 'Z'
+
     return 'Z';
   };
 
   const tambahKelas = () => {
     const nextName = getNextClassName();
-    setKelasList([...kelasList, { 
+    setKelasList([...kelasList, {
       tempId: `${Date.now()}-${Math.random()}`,
-      nama: nextName, 
-      dosen: '', 
-      isExisting: false 
+      nama: nextName,
+      dosen: '',
+      isExisting: false
     }]);
   };
 
@@ -207,12 +202,10 @@ export default function KelasPage() {
     setSearchMatkul('');
     setKelasList([]);
     if (kode) {
-      // Find kurikulum ID for the selected kode_kurikulum
       const selected = kurikulumMasterList.find(k => k.kode_kurikulum === kode && String(k.f_tahun_akademik) === String(selectedTahunAkademik));
       if (selected) {
         setSelectedKurikulumId(selected.id);
         setSelectedTahunAjaran(String(selected.tahun_ajaran));
-        // Fetch matkul dan dosen for selected kurikulum
         fetchMatkul(selected.id);
         fetchDosen(selected.nama_kurikulum);
       }
@@ -220,7 +213,6 @@ export default function KelasPage() {
   };
 
   const handleSemesterChange = (sem) => {
-    // Always keep one semester selected, can only switch between gasal/genap
     if (selectedSemester !== sem) {
       setSelectedSemester(sem);
     }
@@ -238,7 +230,6 @@ export default function KelasPage() {
       }));
       const existingClasses = kelasList.filter(k => k.isExisting);
 
-      // POST kelas baru
       if (newClasses.length > 0) {
         const res = await fetch('/api/kelas', {
           method: 'POST',
@@ -253,7 +244,6 @@ export default function KelasPage() {
         if (!res.ok) throw new Error('Gagal simpan kelas baru');
       }
 
-      // PUT update kelas yang sudah ada (jika dosen berubah)
       for (const kelas of existingClasses) {
         const res = await fetch('/api/kelas', {
           method: 'PUT',
@@ -304,7 +294,6 @@ export default function KelasPage() {
   };
 
   const handleEditKelas = (kelas) => {
-    // Detail-only mode (read-only)
     setEditingKelas({ ...kelas, isDetailOnly: true });
     setEditingDosenSearch('');
     setShowDosenDropdown(false);
@@ -314,7 +303,7 @@ export default function KelasPage() {
   const handleEditDosenChange = (val) => {
     setEditingKelas({ ...editingKelas, dosen: val });
     setEditingDosenSearch(val);
-    setShowDosenDropdown(true); // Keep dropdown open saat user ketik
+    setShowDosenDropdown(true);
   };
 
   const handleSelectDosenFromDropdown = (dosenName) => {
@@ -383,53 +372,36 @@ export default function KelasPage() {
     });
   };
 
-  const sortedKelasBaru = [...kelasBaru];
-  if (sortConfig.key) {
-    sortedKelasBaru.sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
-      if (!aVal && !bVal) return 0;
-      if (!aVal) return 1;
-      if (!bVal) return -1;
-      return sortConfig.direction === 'asc'
-        ? aVal > bVal ? 1 : -1
-        : aVal < bVal ? 1 : -1;
-    });
-  }
-
   const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
-    return sortConfig.direction === 'asc' ? '↑' : '↓';
+    if (sortConfig.key !== key) return '↕';
+    if (sortConfig.direction === 'asc') return '↑';
+    if (sortConfig.direction === 'desc') return '↓';
+    return '↕';
   };
 
   const filteredMatkul = matkul.filter(m => {
-    // Filter by search keyword
     const matchKeyword = m.f_kodemk.toLowerCase().includes(searchMatkul.toLowerCase()) ||
       m.f_namamk.toLowerCase().includes(searchMatkul.toLowerCase());
-    
-    // Filter by semester if tab is 'add' and semester is selected in filter
+
     if (activeTab === 'add' && selectedSemester) {
       const semesterNumbers = selectedSemester === 'gasal' ? [1, 3, 5, 7] : [2, 4, 6, 8];
       return matchKeyword && semesterNumbers.includes(m.f_semester);
     }
-    
+
     return matchKeyword;
   });
 
   const getFilteredDataByMasterFilters = () => {
     let filtered = kelasBaru;
 
-    // Filter by tahun akademik
     if (selectedTahunAkademik) {
       filtered = filtered.filter(k => String(k.f_tahun_akademik) === String(selectedTahunAkademik));
     }
 
-    // Filter by kode kurikulum
     if (selectedKodeKurikulum) {
       filtered = filtered.filter(k => k.kode_kurikulum === selectedKodeKurikulum);
     }
 
-    // Filter by semester (gasal/genap)
     if (selectedSemester) {
       if (selectedSemester === 'gasal') {
         filtered = filtered.filter(k => k.f_semester && [1, 3, 5, 7].includes(parseInt(k.f_semester)));
@@ -438,7 +410,6 @@ export default function KelasPage() {
       }
     }
 
-    // Filter by tahun ajaran
     if (selectedTahunAjaran) {
       filtered = filtered.filter(k => String(k.tahun_ajaran) === String(selectedTahunAjaran));
     }
@@ -449,7 +420,7 @@ export default function KelasPage() {
   const getGroupedFilteredData = () => {
     const grouped = {};
     const filteredData = getFilteredDataByMasterFilters();
-  
+
     filteredData.forEach(k => {
       const key = `${k.f_matkul_id}||${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
       if (!grouped[key]) {
@@ -465,7 +436,7 @@ export default function KelasPage() {
       }
       grouped[key].classes.push(k);
     });
-  
+
     return Object.values(grouped);
   };
 
@@ -475,20 +446,16 @@ export default function KelasPage() {
       prodiMap[p.id] = p.nama_kurikulum;
     });
 
-    // First apply filters
     let filtered = kelasBaru;
 
-    // Filter by tahun akademik
     if (selectedTahunAkademik) {
       filtered = filtered.filter(k => String(k.f_tahun_akademik) === String(selectedTahunAkademik));
     }
 
-    // Filter by kode kurikulum
     if (selectedKodeKurikulum) {
       filtered = filtered.filter(k => k.kode_kurikulum === selectedKodeKurikulum);
     }
 
-    // Filter by semester (gasal/genap)
     if (selectedSemester) {
       if (selectedSemester === 'gasal') {
         filtered = filtered.filter(k => k.f_semester && [1, 3, 5, 7].includes(parseInt(k.f_semester)));
@@ -497,17 +464,15 @@ export default function KelasPage() {
       }
     }
 
-    // Filter by tahun ajaran
     if (selectedTahunAjaran) {
       filtered = filtered.filter(k => String(k.tahun_ajaran) === String(selectedTahunAjaran));
     }
 
-    // Then apply keyword search
     if (searchKeywordView.trim()) {
       const keyword = searchKeywordView.toLowerCase();
       filtered = filtered.filter(k => {
         const prodiName = prodiMap[k.f_kurikulum] || '';
-        
+
         return (
           k.f_kodemk.toLowerCase().includes(keyword) ||
           k.f_namamk.toLowerCase().includes(keyword) ||
@@ -522,7 +487,6 @@ export default function KelasPage() {
       });
     }
 
-    // Group filtered data - include f_matkul_id to ensure separate mata kuliah are not grouped together
     const grouped = {};
     filtered.forEach(k => {
       const key = `${k.f_matkul_id}||${k.f_kurikulum}||${k.f_kodemk}||${k.f_namamk}`;
@@ -543,46 +507,147 @@ export default function KelasPage() {
     return Object.values(grouped);
   };
 
+  // Dashboard summary stats (Edumy-style stat widgets)
+  const totalMatkul = getGroupedFilteredData().length;
+  const totalKelas = getFilteredDataByMasterFilters().length;
+  const totalDosenTerisi = new Set(getFilteredDataByMasterFilters().map((k) => k.dosen).filter(Boolean)).size;
+  const totalBelumDosen = getFilteredDataByMasterFilters().filter((k) => !k.dosen).length;
+
+  // Add hover styles + font import on client side only (same approach as DosenPage)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
+      button:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      input:hover, select:hover, textarea:hover {
+        border-color: #FF7A00 !important;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
+      }
+
+      tr.edumy-row:hover {
+        background-color: #FFF6EC !important;
+      }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
+
   // UI
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>📚 Dashboard KRS Matakuliah</h1>
+      <div style={styles.pageWrap}>
 
-        {messagePopup.show && (
-          <div style={styles.modalOverlay} onClick={closeMessagePopup}>
-            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
-              <h2 style={styles.popupTitle}>{messagePopup.type === 'success' ? '✅' : '❌'}</h2>
-              <p style={styles.popupText}>{messagePopup.text}</p>
-              <button style={styles.btnClose} onClick={closeMessagePopup}>Tutup</button>
+        {/* Edumy-style breadcrumb / page header */}
+        <div style={styles.pageHeader}>
+          <div>
+            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Manajemen Akademik <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Kelas</span></div>
+            <h1 style={styles.title}>Dashboard KRS Matakuliah</h1>
+            <p style={styles.subtitle}>Kelola kelas, penempatan dosen, dan preferensi jadwal per mata kuliah.</p>
+          </div>
+          <div style={styles.headerIconWrap}>
+            <span style={styles.headerIcon}>📚</span>
+          </div>
+        </div>
+
+        {/* Stat widgets */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>📖</div>
+            <div>
+              <div style={styles.statNumber}>{totalMatkul}</div>
+              <div style={styles.statLabel}>Mata Kuliah</div>
             </div>
           </div>
-        )}
-
-        {/* ==================== TAB 1: LIHAT KELAS ==================== */}
-        {activeTab === 'view' && (
-          <div style={styles.tableWrapper}>
-            {/* Master Filter: Tahun Akademik */}
-            <div style={styles.masterFilter}>
-              <label style={styles.filterLabel}>📅 Tahun Akademik:</label>
-              <select
-                value={selectedTahunAkademik}
-                onChange={(e) => handleTahunAkademikChange(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">-- Pilih Tahun Akademik --</option>
-                {tahunAkademikList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.tahun_akademik}
-                  </option>
-                ))}
-              </select>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#EDEBFF', color: '#5B4FE0' }}>🏷️</div>
+            <div>
+              <div style={styles.statNumber}>{totalKelas}</div>
+              <div style={styles.statLabel}>Total Kelas</div>
             </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#12B886' }}>👤</div>
+            <div>
+              <div style={styles.statNumber}>{totalDosenTerisi}</div>
+              <div style={styles.statLabel}>Dosen Terisi</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FDE8F1', color: '#E0448A' }}>⚠️</div>
+            <div>
+              <div style={styles.statNumber}>{totalBelumDosen}</div>
+              <div style={styles.statLabel}>Belum Ada Dosen</div>
+            </div>
+          </div>
+        </div>
 
-            {/* Subfilters: Kode Kurikulum, Semester & Tahun Ajaran */}
-            {selectedTahunAkademik && (
-              <div style={styles.subFilters}>
-                <label style={styles.filterLabel}>📖 Kode Kurikulum:</label>
+        <div style={styles.card}>
+
+          {messagePopup.show && (
+            <div style={styles.modal} onClick={closeMessagePopup}>
+              <div
+                style={{
+                  ...styles.modalContentSmall,
+                  ...(messagePopup.type === 'success' ? styles.popupSuccess : styles.popupError),
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={styles.popupIcon}>
+                  {messagePopup.type === 'success' ? '✅' : '❌'}
+                </div>
+                <p style={styles.popupText}>{messagePopup.text}</p>
+                <button style={styles.btnClose} onClick={closeMessagePopup}>
+                  Tutup
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Master Filter: Tahun Akademik */}
+          <div style={styles.masterFilter}>
+            <label style={styles.filterLabel}>📅 Tahun Akademik</label>
+            <select
+              value={selectedTahunAkademik}
+              onChange={(e) => handleTahunAkademikChange(e.target.value)}
+              style={styles.select}
+            >
+              <option value="">-- Pilih Tahun Akademik --</option>
+              {tahunAkademikList.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.tahun_akademik}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subfilters: Kode Kurikulum, Semester & Tahun Ajaran */}
+          {selectedTahunAkademik && (
+            <div style={styles.subFilters}>
+              <div>
+                <label style={styles.filterLabel}>📖 Kode Kurikulum</label>
                 <select
                   value={selectedKodeKurikulum}
                   onChange={(e) => handleKodeKurikulumChange(e.target.value)}
@@ -595,8 +660,10 @@ export default function KelasPage() {
                     </option>
                   ))}
                 </select>
+              </div>
 
-                <label style={styles.filterLabel}>📚 Semester:</label>
+              <div>
+                <label style={styles.filterLabel}>📚 Semester</label>
                 <div style={styles.semesterToggleGroup}>
                   <button
                     style={{
@@ -617,8 +684,10 @@ export default function KelasPage() {
                     Genap (2,4,6,8)
                   </button>
                 </div>
+              </div>
 
-                <label style={styles.filterLabel}>📆 Tahun Ajaran:</label>
+              <div>
+                <label style={styles.filterLabel}>📆 Tahun Ajaran</label>
                 <select
                   value={selectedTahunAjaran}
                   onChange={(e) => setSelectedTahunAjaran(e.target.value)}
@@ -633,421 +702,286 @@ export default function KelasPage() {
                   )}
                 </select>
               </div>
-            )}
-
-            {/* TAB NAVIGATION - Below Kode Kurikulum */}
-            <div style={styles.toolbar}>
-              <div style={styles.toolbarLeft}>
-                <button
-                  style={{
-                    ...styles.btnPrimary,
-                    ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
-                  }}
-                  onClick={() => setActiveTab('view')}
-                >
-                  📋 Lihat Data Kelas
-                </button>
-                <button
-                  style={{
-                    ...styles.btnPrimary,
-                    ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
-                  }}
-                  onClick={() => setActiveTab('add')}
-                >
-                  ➕ Tambah Matakuliah
-                </button>
-              </div>
             </div>
+          )}
 
-            <div style={styles.tableHeader}>
-              <h2>📋 Daftar Kelas yang Tersimpan</h2>
+          {/* Toolbar / tab navigation */}
+          <div style={styles.toolbar}>
+            <div style={styles.toolbarLeft}>
               <button
-                style={{
-                  ...styles.btnPrimary,
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.9rem',
-                }}
-                onClick={() => fetchKelasBaru()}
+                style={activeTab === 'view' ? styles.btnPrimary : styles.btnOutlineTeal}
+                onClick={() => setActiveTab('view')}
               >
-                🔍 Refresh Data
+                📋 Lihat Data Kelas
+              </button>
+              <button
+                style={activeTab === 'add' ? styles.btnPrimary : styles.btnOutlineTeal}
+                onClick={() => setActiveTab('add')}
+              >
+                ➕ Tambah Matakuliah
               </button>
             </div>
+          </div>
 
-            {/* Check if filters are complete */}
-            {!selectedTahunAkademik || !selectedKodeKurikulum || !selectedTahunAjaran ? (
-              <div style={styles.emptyState}>
-                <span style={styles.emptyIcon}>📭</span>
-                <p>Filter belum lengkap</p>
-                <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
-                  Silakan pilih <strong>Tahun Akademik</strong>, <strong>Kode Kurikulum</strong>, dan <strong>Tahun Ajaran</strong> untuk menampilkan daftar kelas
-                </p>
-              </div>
-            ) : (
-              <div>
-                {/* Search Filter */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <input
-                    type="text"
-                    value={searchKeywordView}
-                    onChange={(e) => setSearchKeywordView(e.target.value)}
-                    placeholder="🔍 Cari kelas (Program Studi, Kode MK, Nama, Dosen, SKS, Semester...)..."
-                    style={{
-                      ...styles.select,
-                      width: '100%',
-                      padding: '0.75rem',
-                      fontSize: '0.95rem',
-                      borderColor: searchKeywordView ? '#667eea' : '#e2e8f0',
-                      boxShadow: searchKeywordView ? '0 0 0 3px rgba(102, 126, 234, 0.1)' : 'none',
-                    }}
-                  />
-                  {searchKeywordView && (
-                    <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
-                      Menampilkan hasil untuk: <strong>&quot;{searchKeywordView}&quot;</strong>
-                    </p>
-                  )}
+          {/* ==================== TAB 1: LIHAT KELAS ==================== */}
+          {activeTab === 'view' && (
+            <div style={styles.tableWrapper}>
+              <div style={styles.tableHeader}>
+                <h2 style={styles.tableTitle}>📋 Daftar Kelas yang Tersimpan</h2>
+                <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center' }}>
+                  <span style={styles.badgeCount}>Total: {kelasBaru.length} kelas</span>
+                  <button style={styles.btnOutlineTeal} onClick={() => fetchKelasBaru()}>
+                    🔄 Refresh Data
+                  </button>
                 </div>
+              </div>
 
-                {kelasBaru.length === 0 ? (
-                  <div style={styles.emptyState}>
-                    <span style={styles.emptyIcon}>📭</span>
-                    <p>Belum ada kelas yang tersimpan</p>
-                    <button 
-                      style={styles.btnPrimary}
-                      onClick={() => setActiveTab('add')}
-                    >
-                      ➕ Buat Kelas
-                    </button>
+              {!selectedTahunAkademik || !selectedKodeKurikulum || !selectedTahunAjaran ? (
+                <div style={styles.emptyState}>
+                  <span style={styles.emptyIcon}>📭</span>
+                  <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Filter belum lengkap</p>
+                  <small style={{ color: '#8A96AD' }}>
+                    Silakan pilih <strong>Tahun Akademik</strong>, <strong>Kode Kurikulum</strong>, dan <strong>Tahun Ajaran</strong> untuk menampilkan daftar kelas
+                  </small>
+                </div>
+              ) : (
+                <div>
+                  {/* Search Filter */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <input
+                      type="text"
+                      value={searchKeywordView}
+                      onChange={(e) => setSearchKeywordView(e.target.value)}
+                      placeholder="🔍 Cari kelas (Program Studi, Kode MK, Nama, Dosen, SKS, Semester...)..."
+                      style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
+                    />
+                    {searchKeywordView && (
+                      <p style={{ fontSize: '0.85rem', color: '#8A96AD', marginTop: '0.5rem' }}>
+                        Menampilkan hasil untuk: <strong>&quot;{searchKeywordView}&quot;</strong>
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <div style={styles.tableContainer}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr style={styles.tableHeaderRow}>
-                          <th style={{ ...styles.th, width: '50px' }}></th>
-                          <th style={styles.th} onClick={() => handleSort('f_kurikulum')}>
-                            Program Studi {renderSortIcon('f_kurikulum')}
-                          </th>
-                          <th style={styles.th} onClick={() => handleSort('f_kodemk')}>
-                            Kode MK {renderSortIcon('f_kodemk')}
-                          </th>
-                          <th style={styles.th} onClick={() => handleSort('f_namamk')}>
-                            Mata Kuliah {renderSortIcon('f_namamk')}
-                          </th>
-                          <th style={styles.th} onClick={() => handleSort('f_sks_kurikulum')}>
-                            SKS {renderSortIcon('f_sks_kurikulum')}
-                          </th>
-                          <th style={styles.th} onClick={() => handleSort('f_semester')}>
-                            Semester {renderSortIcon('f_semester')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(searchKeywordView ? getFilteredAndGroupedData() : getGroupedFilteredData()).map((group, idx) => {
-                      const prodiName = prodi.find(p => p.id === group.f_kurikulum)?.nama_kurikulum || '-';
-                      const groupKey = `${group.f_matkul_id}||${group.f_kurikulum}||${group.f_kodemk}||${group.f_namamk}`;
-                      const isExpanded = expandedGroups[groupKey];
-                      
-                      return (
-                        <Fragment key={groupKey}>
-                          {/* Header row - Program Studi, Kode MK, Mata Kuliah */}
-                          <tr style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
-                            <td style={{ ...styles.td, textAlign: 'center', padding: '1rem 0.5rem' }}>
-                              <button
-                                style={styles.btnExpand}
-                                onClick={() => toggleExpandGroup(groupKey)}
-                                title={isExpanded ? 'Sembunyikan kelas' : 'Tampilkan kelas'}
-                              >
-                                {isExpanded ? '▼' : '▶'}
-                              </button>
-                            </td>
-                            <td style={styles.td}>{prodiName}</td>
-                            <td style={styles.td}>
-                              <span style={styles.badgeCode}>{group.f_kodemk}</span>
-                            </td>
-                            <td style={styles.td}>
-                              {group.f_namamk}
-                              <span style={styles.classBadge}>{group.classes.length} kelas</span>
-                            </td>
-                            <td style={styles.td}>
-                              <span style={styles.sksBadge}>{group.f_sks_kurikulum}</span>
-                            </td>
-                            <td style={styles.td}>
-                              <span style={styles.semesterBadge}>Semester {group.f_semester}</span>
-                            </td>
+
+                  {kelasBaru.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <span style={styles.emptyIcon}>📭</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada kelas yang tersimpan</p>
+                      <button style={{ ...styles.btnPrimary, marginTop: '1rem' }} onClick={() => setActiveTab('add')}>
+                        ➕ Buat Kelas
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={styles.tableContainer}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr style={styles.tableHeaderRow}>
+                            <th style={{ ...styles.th, width: '50px' }}></th>
+                            <th style={styles.th} onClick={() => handleSort('f_kurikulum')}>
+                              Program Studi <span style={styles.sortIcon}>{renderSortIcon('f_kurikulum')}</span>
+                            </th>
+                            <th style={styles.th} onClick={() => handleSort('f_kodemk')}>
+                              Kode MK <span style={styles.sortIcon}>{renderSortIcon('f_kodemk')}</span>
+                            </th>
+                            <th style={styles.th} onClick={() => handleSort('f_namamk')}>
+                              Mata Kuliah <span style={styles.sortIcon}>{renderSortIcon('f_namamk')}</span>
+                            </th>
+                            <th style={styles.th} onClick={() => handleSort('f_sks_kurikulum')}>
+                              SKS <span style={styles.sortIcon}>{renderSortIcon('f_sks_kurikulum')}</span>
+                            </th>
+                            <th style={styles.th} onClick={() => handleSort('f_semester')}>
+                              Semester <span style={styles.sortIcon}>{renderSortIcon('f_semester')}</span>
+                            </th>
                           </tr>
+                        </thead>
+                        <tbody>
+                          {(searchKeywordView ? getFilteredAndGroupedData() : getGroupedFilteredData()).map((group) => {
+                            const prodiName = prodi.find(p => p.id === group.f_kurikulum)?.nama_kurikulum || '-';
+                            const groupKey = `${group.f_matkul_id}||${group.f_kurikulum}||${group.f_kodemk}||${group.f_namamk}`;
+                            const isExpanded = expandedGroups[groupKey];
 
-                          {/* Expanded detail row */}
-                          {isExpanded && (
-                            <tr style={{ backgroundColor: '#f0f7ff' }}>
-                              <td colSpan="6" style={{ ...styles.td, padding: '1.5rem' }}>
-                                <div style={styles.expandedContent}>
-                                  <h3 style={styles.expandedTitle}>📚 Detail Kelas ({group.classes.length})</h3>
-                                  
-                                  <div style={styles.classesTable}>
-                                    <div style={styles.classesTableHeader}>
-                                      <div style={{ ...styles.classesTableCell, fontWeight: '600', flex: '0 0 150px' }}>Kelas</div>
-                                      <div style={{ ...styles.classesTableCell, fontWeight: '600', flex: 1 }}>Dosen</div>
-                                      <div style={{ ...styles.classesTableCell, fontWeight: '600', flex: '0 0 120px', textAlign: 'center' }}>Aksi</div>
-                                    </div>
-                                    
+                            return (
+                              <Fragment key={groupKey}>
+                                <tr className="edumy-row" style={styles.tableRow}>
+                                  <td style={{ ...styles.td, textAlign: 'center' }}>
+                                    <button
+                                      style={styles.btnExpand}
+                                      onClick={() => toggleExpandGroup(groupKey)}
+                                      title={isExpanded ? 'Sembunyikan kelas' : 'Tampilkan kelas'}
+                                    >
+                                      {isExpanded ? '▼' : '▶'}
+                                    </button>
+                                  </td>
+                                  <td style={styles.td}>{prodiName}</td>
+                                  <td style={styles.td}>
+                                    <span style={styles.badgeCode}>{group.f_kodemk}</span>
+                                  </td>
+                                  <td style={styles.td}>
+                                    <strong style={{ color: '#2B3654' }}>{group.f_namamk}</strong>
+                                    <span style={styles.classBadge}>{group.classes.length} kelas</span>
+                                  </td>
+                                  <td style={styles.td}>
+                                    <span style={styles.badgeSks}>{group.f_sks_kurikulum} SKS</span>
+                                  </td>
+                                  <td style={styles.td}>
+                                    <span style={styles.badgeSemester}>Semester {group.f_semester}</span>
+                                  </td>
+                                </tr>
 
-                                    {group.classes
-                                      .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas))
-                                      .map((kelas, kelasIdx) => (
-                                        <Fragment key={`${kelas.id || 'new'}-${kelas.nama_kelas}-${kelasIdx}`}>
-                                          <div style={styles.classesTableRow}>
-                                            <div style={{ ...styles.classesTableCell, flex: '0 0 150px' }}>
-                                              <span style={styles.badgeKelas}>{kelas.nama_kelas}</span>
-                                            </div>
-                                            <div style={{ ...styles.classesTableCell, flex: 1 }}>
-                                              {kelas.dosen || <span style={{ color: '#a0aec0' }}>-</span>}
-                                            </div>
-                                            <div style={{ ...styles.classesTableCell, flex: '0 0 120px', textAlign: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                                              <button
-                                                style={styles.btnEditSmall}
-                                                onClick={() => handleEditKelas(kelas)}
-                                                title="Lihat detail kelas"
-                                              >
-                                                📋 Detail
-                                              </button>
-                                              <button
-                                                style={styles.btnDeleteSmall}
-                                                onClick={() => handleDeleteClassFromView(kelas.id)}
-                                                title="Hapus kelas"
-                                              >
-                                                🗑️
-                                              </button>
-                                            </div>
+                                {isExpanded && (
+                                  <tr>
+                                    <td colSpan="6" style={{ ...styles.td, padding: '1.5rem', background: '#FFF6EC' }}>
+                                      <div style={styles.expandedContent}>
+                                        <h3 style={styles.expandedTitle}>📚 Detail Kelas ({group.classes.length})</h3>
+
+                                        <div style={styles.classesTable}>
+                                          <div style={styles.classesTableHeader}>
+                                            <div style={{ ...styles.classesTableCell, fontWeight: '700', flex: '0 0 150px' }}>Kelas</div>
+                                            <div style={{ ...styles.classesTableCell, fontWeight: '700', flex: 1 }}>Dosen</div>
+                                            <div style={{ ...styles.classesTableCell, fontWeight: '700', flex: '0 0 150px', textAlign: 'center' }}>Aksi</div>
                                           </div>
 
-                                          {/* Preferences Row */}
-                                          {(kelas.prefer_lantai || kelas.prefer_hari || kelas.avoid_hari || kelas.prefer_jam_mulai || kelas.prefer_jam_selesai) && (
-                                            <div style={{ ...styles.classesTableRow, backgroundColor: '#fafafa', paddingLeft: '2rem', fontSize: '0.85rem' }}>
-                                              <div style={{ ...styles.classesTableCell, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
-                                                <div>
-                                                  <span style={{ color: '#666', fontWeight: '500' }}>Lantai:</span>
-                                                  <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_lantai ? '#2d3748' : '#a0aec0' }}>
-                                                    {kelas.prefer_lantai || '—'}
-                                                  </p>
+                                          {group.classes
+                                            .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas))
+                                            .map((kelas, kelasIdx) => (
+                                              <Fragment key={`${kelas.id || 'new'}-${kelas.nama_kelas}-${kelasIdx}`}>
+                                                <div style={styles.classesTableRow}>
+                                                  <div style={{ ...styles.classesTableCell, flex: '0 0 150px' }}>
+                                                    <span style={styles.badgeKelas}>{kelas.nama_kelas}</span>
+                                                  </div>
+                                                  <div style={{ ...styles.classesTableCell, flex: 1 }}>
+                                                    {kelas.dosen || <span style={{ color: '#B7BEC9' }}>-</span>}
+                                                  </div>
+                                                  <div style={{ ...styles.classesTableCell, flex: '0 0 150px', textAlign: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                                                    <button
+                                                      style={styles.btnIconInfo}
+                                                      onClick={() => handleEditKelas(kelas)}
+                                                      title="Lihat detail kelas"
+                                                    >
+                                                      📋
+                                                    </button>
+                                                    <button
+                                                      style={styles.btnIconDanger}
+                                                      onClick={() => handleDeleteClassFromView(kelas.id)}
+                                                      title="Hapus kelas"
+                                                    >
+                                                      🗑️
+                                                    </button>
+                                                  </div>
                                                 </div>
-                                                <div>
-                                                  <span style={{ color: '#666', fontWeight: '500' }}>Hari:</span>
-                                                  <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_hari ? '#2d3748' : '#a0aec0' }}>
-                                                    {kelas.prefer_hari || '—'}
-                                                  </p>
-                                                </div>
-                                                <div>
-                                                  <span style={{ color: '#666', fontWeight: '500' }}>Hindari:</span>
-                                                  <p style={{ margin: '0.25rem 0 0 0', color: kelas.avoid_hari ? '#2d3748' : '#a0aec0' }}>
-                                                    {kelas.avoid_hari || '—'}
-                                                  </p>
-                                                </div>
-                                                <div>
-                                                  <span style={{ color: '#666', fontWeight: '500' }}>Jam Mulai:</span>
-                                                  <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_jam_mulai ? '#2d3748' : '#a0aec0' }}>
-                                                    {kelas.prefer_jam_mulai || '—'}
-                                                  </p>
-                                                </div>
-                                                <div>
-                                                  <span style={{ color: '#666', fontWeight: '500' }}>Jam Selesai:</span>
-                                                  <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_jam_selesai ? '#2d3748' : '#a0aec0' }}>
-                                                    {kelas.prefer_jam_selesai || '—'}
-                                                  </p>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </Fragment>
-                                      ))}
-                                  </div>
 
-                                  {/* Edit Kelas button - navigate to add tab */}
-                                  <button
-                                    style={{ ...styles.btnPrimary, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: '100%', marginTop: '0.75rem' }}
-                                    onClick={() => {
-                                      // Load this mata kuliah in the add tab
-                                      const matkul = group.classes[0];
-                                      const mkData = {
-                                        id: matkul.f_matkul_id,
-                                        f_kodemk: matkul.f_kodemk,
-                                        f_namamk: matkul.f_namamk,
-                                        f_sks_kurikulum: matkul.f_sks_kurikulum,
-                                        f_semester: matkul.f_semester,
-                                      };
-                                      setSelectedMatkul(mkData);
-                                      setSearchMatkul(`${mkData.f_kodemk} - ${mkData.f_namamk}`);
-                                      setKelasList(group.classes.map(k => ({
-                                        id: k.id,
-                                        nama: k.nama_kelas,
-                                        dosen: k.dosen || '',
-                                        isExisting: true,
-                                      })));
-                                      setActiveTab('add');
-                                    }}
-                                  >
-                                    ✏️ Edit Kelas
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                  </div>
-                )}
+                                                {(kelas.prefer_lantai || kelas.prefer_hari || kelas.avoid_hari || kelas.prefer_jam_mulai || kelas.prefer_jam_selesai) && (
+                                                  <div style={{ ...styles.classesTableRow, backgroundColor: '#FAFBFF', fontSize: '0.85rem' }}>
+                                                    <div style={{ ...styles.classesTableCell, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+                                                      <div>
+                                                        <span style={{ color: '#8A96AD', fontWeight: '500' }}>Lantai:</span>
+                                                        <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_lantai ? '#1E2A45' : '#B7BEC9' }}>
+                                                          {kelas.prefer_lantai || '—'}
+                                                        </p>
+                                                      </div>
+                                                      <div>
+                                                        <span style={{ color: '#8A96AD', fontWeight: '500' }}>Hari:</span>
+                                                        <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_hari ? '#1E2A45' : '#B7BEC9' }}>
+                                                          {kelas.prefer_hari || '—'}
+                                                        </p>
+                                                      </div>
+                                                      <div>
+                                                        <span style={{ color: '#8A96AD', fontWeight: '500' }}>Hindari:</span>
+                                                        <p style={{ margin: '0.25rem 0 0 0', color: kelas.avoid_hari ? '#1E2A45' : '#B7BEC9' }}>
+                                                          {kelas.avoid_hari || '—'}
+                                                        </p>
+                                                      </div>
+                                                      <div>
+                                                        <span style={{ color: '#8A96AD', fontWeight: '500' }}>Jam Mulai:</span>
+                                                        <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_jam_mulai ? '#1E2A45' : '#B7BEC9' }}>
+                                                          {kelas.prefer_jam_mulai || '—'}
+                                                        </p>
+                                                      </div>
+                                                      <div>
+                                                        <span style={{ color: '#8A96AD', fontWeight: '500' }}>Jam Selesai:</span>
+                                                        <p style={{ margin: '0.25rem 0 0 0', color: kelas.prefer_jam_selesai ? '#1E2A45' : '#B7BEC9' }}>
+                                                          {kelas.prefer_jam_selesai || '—'}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </Fragment>
+                                            ))}
+                                        </div>
 
-            {/* Kondisi: Tidak ada hasil search */}
-            {searchKeywordView && getFilteredAndGroupedData().length === 0 && (
-              <div style={{ ...styles.emptyState, padding: '2rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '2rem', display: 'block', marginBottom: '1rem' }}>🔍</span>
-                <p style={{ marginBottom: '0.5rem' }}>Tidak ada kelas yang cocok</p>
-                <p style={{ fontSize: '0.9rem', color: '#a0aec0' }}>Tidak menemukan kelas dengan keyword: <strong>&quot;{searchKeywordView}&quot;</strong></p>
-                <button
-                  style={{ ...styles.btnPrimary, marginTop: '1rem' }}
-                  onClick={() => setSearchKeywordView('')}
-                >
-                  ❌ Hapus Filter
-                </button>
-              </div>
-            )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ==================== TAB 2: KELOLA KELAS ==================== */}
-        {activeTab === 'add' && (
-          <div style={styles.tableWrapper}>
-            {/* Master Filter: Tahun Akademik */}
-            <div style={styles.masterFilter}>
-              <label style={styles.filterLabel}>📅 Tahun Akademik:</label>
-              <select
-                value={selectedTahunAkademik}
-                onChange={(e) => handleTahunAkademikChange(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">-- Pilih Tahun Akademik --</option>
-                {tahunAkademikList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.tahun_akademik}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Subfilters: Kode Kurikulum, Semester & Tahun Ajaran */}
-            {selectedTahunAkademik && (
-              <div style={styles.subFilters}>
-                <label style={styles.filterLabel}>📖 Kode Kurikulum:</label>
-                <select
-                  value={selectedKodeKurikulum}
-                  onChange={(e) => handleKodeKurikulumChange(e.target.value)}
-                  style={styles.select}
-                >
-                  <option value="">-- Pilih Kode Kurikulum --</option>
-                  {[...new Set(kurikulumMasterList.map(k => k.kode_kurikulum))].map((kode) => (
-                    <option key={kode} value={kode}>
-                      {kode}
-                    </option>
-                  ))}
-                </select>
-
-                <label style={styles.filterLabel}>📚 Semester:</label>
-                <div style={styles.semesterToggleGroup}>
-                  <button
-                    style={{
-                      ...styles.toggleButton,
-                      ...(selectedSemester === 'gasal' ? styles.toggleButtonActive : styles.toggleButtonInactive),
-                    }}
-                    onClick={() => handleSemesterChange('gasal')}
-                  >
-                    Gasal (1,3,5,7)
-                  </button>
-                  <button
-                    style={{
-                      ...styles.toggleButton,
-                      ...(selectedSemester === 'genap' ? styles.toggleButtonActive : styles.toggleButtonInactive),
-                    }}
-                    onClick={() => handleSemesterChange('genap')}
-                  >
-                    Genap (2,4,6,8)
-                  </button>
-                </div>
-
-                <label style={styles.filterLabel}>📆 Tahun Ajaran:</label>
-                <select
-                  value={selectedTahunAjaran}
-                  onChange={(e) => setSelectedTahunAjaran(e.target.value)}
-                  style={styles.select}
-                  disabled={!selectedKodeKurikulum}
-                >
-                  <option value="">-- Pilih Tahun Ajaran --</option>
-                  {selectedKodeKurikulum && selectedKurikulumId && (
-                    <option value={selectedTahunAjaran || kurikulumMasterList.find(k => k.id === selectedKurikulumId)?.tahun_ajaran || ''}>
-                      {kurikulumMasterList.find(k => k.id === selectedKurikulumId)?.tahun_ajaran || ''}
-                    </option>
+                                        <button
+                                          style={{ ...styles.btnPrimarySmall, width: '100%', marginTop: '0.75rem' }}
+                                          onClick={() => {
+                                            const matkulRef = group.classes[0];
+                                            const mkData = {
+                                              id: matkulRef.f_matkul_id,
+                                              f_kodemk: matkulRef.f_kodemk,
+                                              f_namamk: matkulRef.f_namamk,
+                                              f_sks_kurikulum: matkulRef.f_sks_kurikulum,
+                                              f_semester: matkulRef.f_semester,
+                                            };
+                                            setSelectedMatkul(mkData);
+                                            setSearchMatkul(`${mkData.f_kodemk} - ${mkData.f_namamk}`);
+                                            setKelasList(group.classes.map(k => ({
+                                              id: k.id,
+                                              nama: k.nama_kelas,
+                                              dosen: k.dosen || '',
+                                              isExisting: true,
+                                            })));
+                                            setActiveTab('add');
+                                          }}
+                                        >
+                                          ✏️ Edit Kelas
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </select>
-              </div>
-            )}
 
-            {/* TAB NAVIGATION - Below Kode Kurikulum */}
-            <div style={styles.toolbar}>
-              <div style={styles.toolbarLeft}>
-                <button
-                  style={{
-                    ...styles.btnPrimary,
-                    ...(activeTab === 'view' ? styles.activeTab : styles.inactiveTab),
-                  }}
-                  onClick={() => setActiveTab('view')}
-                >
-                  📋 Lihat Data Kelas
-                </button>
-                <button
-                  style={{
-                    ...styles.btnPrimary,
-                    ...(activeTab === 'add' ? styles.activeTab : styles.inactiveTab),
-                  }}
-                  onClick={() => setActiveTab('add')}
-                >
-                  ➕ Tambah Matakuliah
-                </button>
-              </div>
+                  {searchKeywordView && getFilteredAndGroupedData().length === 0 && (
+                    <div style={{ ...styles.emptyState, marginTop: '1rem' }}>
+                      <span style={styles.emptyIcon}>🔍</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Tidak ada kelas yang cocok</p>
+                      <small style={{ color: '#8A96AD' }}>
+                        Tidak menemukan kelas dengan keyword: <strong>&quot;{searchKeywordView}&quot;</strong>
+                      </small>
+                      <div>
+                        <button
+                          style={{ ...styles.btnSecondary, marginTop: '1rem' }}
+                          onClick={() => setSearchKeywordView('')}
+                        >
+                          ❌ Hapus Filter
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          )}
 
-            {selectedTahunAkademik && selectedKodeKurikulum ? (
-              <div style={{
-                padding: '0.75rem',
-                marginBottom: '1.5rem',
-                backgroundColor: '#e6fffa',
-                borderLeft: '4px solid #38b2ac',
-                borderRadius: '4px',
-                fontSize: '0.9rem',
-                color: '#000000',
-              }}>
-                ℹ️ Menampilkan mata kuliah untuk semester <strong>{selectedSemester === 'gasal' ? 'GASAL (1,3,5,7)' : 'GENAP (2,4,6,8)'}</strong>
-              </div>
-            ) : (
-              <div style={{
-                padding: '1rem',
-                marginBottom: '1.5rem',
-                backgroundColor: '#fef3c7',
-                borderLeft: '4px solid #f59e0b',
-                borderRadius: '4px',
-                color: '#92400e',
-              }}>
-                ⚠️ Silakan pilih filter <strong>Tahun Akademik</strong> dan <strong>Kode Kurikulum</strong> di atas untuk menambahkan kelas
-              </div>
-            )}
+          {/* ==================== TAB 2: KELOLA KELAS ==================== */}
+          {activeTab === 'add' && (
+            <div style={styles.tableWrapper}>
+              {selectedTahunAkademik && selectedKodeKurikulum ? (
+                <div style={styles.noticeInfo}>
+                  ℹ️ Menampilkan mata kuliah untuk semester <strong>{selectedSemester === 'gasal' ? 'GASAL (1,3,5,7)' : 'GENAP (2,4,6,8)'}</strong>
+                </div>
+              ) : (
+                <div style={styles.noticeWarning}>
+                  ⚠️ Silakan pilih filter <strong>Tahun Akademik</strong> dan <strong>Kode Kurikulum</strong> di atas untuk menambahkan kelas
+                </div>
+              )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div>
-                <label style={styles.label}>
-                  Mata Kuliah:
-                </label>
+              <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
+                <label style={styles.label}>Mata Kuliah</label>
                 <input
                   type="text"
                   placeholder="Cari kode atau nama MK..."
@@ -1061,10 +995,9 @@ export default function KelasPage() {
                     }
                   }}
                   onFocus={() => setShowDropdown(true)}
-                  style={styles.select}
+                  style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
                 />
-                
-                {/* Dropdown hasil filter */}
+
                 {showDropdown && searchMatkul && filteredMatkul.length > 0 && (
                   <div style={styles.dropdown}>
                     {filteredMatkul.map(m => (
@@ -1083,415 +1016,380 @@ export default function KelasPage() {
                     ))}
                   </div>
                 )}
-                
+
                 {showDropdown && searchMatkul && filteredMatkul.length === 0 && (
                   <div style={styles.dropdownEmpty}>
                     Tidak ada mata kuliah yang cocok
                   </div>
                 )}
               </div>
-            </div>
 
-            {selectedMatkul && (
-              <div style={styles.selectedInfo}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                  <div>
-                    <p><strong>📖 Mata Kuliah:</strong> {selectedMatkul.f_namamk}</p>
-                    <p><strong>🔢 Kode:</strong> {selectedMatkul.f_kodemk}</p>
-                  </div>
-                  <div>
-                    <p><strong>📊 SKS:</strong> <span style={styles.infoBadge}>{selectedMatkul.f_sks_kurikulum} SKS</span></p>
-                    <p><strong>📅 Semester:</strong> <span style={styles.infoBadge}>Semester {selectedMatkul.f_semester}</span></p>
+              {selectedMatkul && (
+                <div style={styles.selectedInfo}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                    <div>
+                      <p style={{ margin: '0 0 0.4rem 0' }}><strong>📖 Mata Kuliah:</strong> {selectedMatkul.f_namamk}</p>
+                      <p style={{ margin: 0 }}><strong>🔢 Kode:</strong> {selectedMatkul.f_kodemk}</p>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 0.4rem 0' }}><strong>📊 SKS:</strong> <span style={styles.infoBadge}>{selectedMatkul.f_sks_kurikulum} SKS</span></p>
+                      <p style={{ margin: 0 }}><strong>📅 Semester:</strong> <span style={styles.infoBadge}>Semester {selectedMatkul.f_semester}</span></p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {selectedMatkul && (
-              <>
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <button 
-                    style={styles.btnPrimary}
-                    onClick={tambahKelas}
-                  >
-                    ➕ Tambah Kelas ({getNextClassName()})
-                  </button>
-                </div>
-
-                {kelasList.length === 0 ? (
-                  <div style={styles.emptyState}>
-                    <span style={styles.emptyIcon}>📭</span>
-                    <p>Belum ada kelas. Klik &quot;➕ Tambah Kelas&quot; untuk menambahkan.</p>
+              {selectedMatkul && (
+                <>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <button style={styles.btnPrimary} onClick={tambahKelas}>
+                      ➕ Tambah Kelas ({getNextClassName()})
+                    </button>
                   </div>
-                ) : (
-                  <div style={styles.tableContainer}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr style={styles.tableHeaderRow}>
-                          <th style={styles.th}>Kelas</th>
-                          <th style={styles.th}>Dosen</th>
-                          <th style={{ ...styles.th, width: '80px', textAlign: 'center' }}>Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {kelasList.map((k, idx) => (
-                          <tr key={`${k.id || k.tempId}-${k.nama}-${idx}`} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
-                            <td style={styles.td}>
-                              <span style={styles.badgeKelas}>{k.nama}</span>
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                list={`dosen-list-${idx}`}
-                                value={k.dosen}
-                                onChange={(e) => handleDosen(idx, e.target.value)}
-                                placeholder="Ketik atau pilih dosen..."
-                                style={styles.selectInput}
-                              />
-                              <datalist id={`dosen-list-${idx}`}>
-                                {dosenList.map((d) => (
-                                  <option key={d.id} value={d.f_namapegawai} />
-                                ))}
-                              </datalist>
-                             </td>
-                            <td style={{ ...styles.td, textAlign: 'center' }}>
-                              <button
-                                style={styles.btnIconDanger}
-                                onClick={() => handleDeleteKelas(idx)}
-                                title="Hapus"
-                              >
-                                🗑️
-                              </button>
-                             </td>
+
+                  {kelasList.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <span style={styles.emptyIcon}>📭</span>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada kelas</p>
+                      <small style={{ color: '#8A96AD' }}>Klik &quot;➕ Tambah Kelas&quot; untuk menambahkan.</small>
+                    </div>
+                  ) : (
+                    <div style={styles.tableContainer}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr style={styles.tableHeaderRow}>
+                            <th style={styles.th}>Kelas</th>
+                            <th style={styles.th}>Dosen</th>
+                            <th style={{ ...styles.thAksi, width: '80px' }}>Aksi</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {kelasList.length > 0 && (
-                  <button onClick={handleSave} style={styles.btnSuccess}>
-                    💾 Simpan Semua Kelas
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ==================== MODAL EDIT KELAS ==================== */}
-        {showEditModal && editingKelas && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modal}>
-              <div style={styles.modalHeader}>
-                <h2>{editingKelas.isDetailOnly ? '📋 Detail Kelas' : '✏️ Edit Kelas'}</h2>
-                <button
-                  style={styles.btnClose}
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingKelas(null);
-                    setEditingDosenSearch('');
-                    setShowDosenDropdown(false);
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div style={styles.modalBody}>
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={styles.label}>Nama Kelas:</label>
-                  <input
-                    type="text"
-                    value={editingKelas.nama_kelas || ''}
-                    disabled
-                    style={{ ...styles.select, backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
-                  />
-                  <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.5rem' }}>
-                  </p>
-                </div>
-
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={styles.label}>Mata Kuliah:</label>
-                  <input
-                    type="text"
-                    value={editingKelas.f_namamk || ''}
-                    disabled
-                    style={{ ...styles.select, backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-                  <label style={styles.label}>Dosen:</label>
-                  <input
-                    type="text"
-                    value={editingKelas.dosen || ''}
-                    onChange={editingKelas.isDetailOnly ? undefined : (e) => handleEditDosenChange(e.target.value)}
-                    onFocus={editingKelas.isDetailOnly ? undefined : () => setShowDosenDropdown(true)}
-                    onBlur={editingKelas.isDetailOnly ? undefined : () => setTimeout(() => setShowDosenDropdown(false), 200)}
-                    placeholder="Ketik atau pilih dosen..."
-                    disabled={editingKelas.isDetailOnly}
-                    style={{ ...styles.select, backgroundColor: editingKelas.isDetailOnly ? '#f0f0f0' : undefined, cursor: editingKelas.isDetailOnly ? 'not-allowed' : 'text' }}
-                  />
-                  
-                  {/* Dosen Search Dropdown - hanya tampil jika tidak detail mode */}
-                  {!editingKelas.isDetailOnly && showDosenDropdown && (
-                    <div style={styles.dosenDropdownModal}>
-                      {dosenList
-                        .filter(d =>
-                          d.f_namapegawai.toLowerCase().includes(editingDosenSearch.toLowerCase())
-                        )
-                        .map((d) => (
-                          <div
-                            key={d.id}
-                            onClick={() => handleSelectDosenFromDropdown(d.f_namapegawai)}
-                            style={styles.dosenDropdownItem}
-                            title={d.f_namapegawai}
-                          >
-                            <div style={styles.dosenNameModal}>{d.f_namapegawai}</div>
-                            {d.f_title_depan && (
-                              <div style={styles.dosenTitleModal}>
-                                {d.f_title_depan} {d.f_title_belakang || ''}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      {dosenList.filter(d =>
-                        d.f_namapegawai.toLowerCase().includes(editingDosenSearch.toLowerCase())
-                      ).length === 0 && (
-                        <div style={{ ...styles.dosenDropdownItem, textAlign: 'center', color: '#a0aec0' }}>
-                          Tidak ada dosen yang cocok
-                        </div>
-                      )}
+                        </thead>
+                        <tbody>
+                          {kelasList.map((k, idx) => (
+                            <tr key={`${k.id || k.tempId}-${k.nama}-${idx}`} className="edumy-row" style={styles.tableRow}>
+                              <td style={styles.td}>
+                                <span style={styles.badgeKelas}>{k.nama}</span>
+                              </td>
+                              <td style={styles.td}>
+                                <input
+                                  list={`dosen-list-${idx}`}
+                                  value={k.dosen}
+                                  onChange={(e) => handleDosen(idx, e.target.value)}
+                                  placeholder="Ketik atau pilih dosen..."
+                                  style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
+                                />
+                                <datalist id={`dosen-list-${idx}`}>
+                                  {dosenList.map((d) => (
+                                    <option key={d.id} value={d.f_namapegawai} />
+                                  ))}
+                                </datalist>
+                              </td>
+                              <td style={{ ...styles.tdAksi }}>
+                                <button
+                                  style={styles.btnIconDanger}
+                                  onClick={() => handleDeleteKelas(idx)}
+                                  title="Hapus"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
+
+                  {kelasList.length > 0 && (
+                    <button onClick={handleSave} style={{ ...styles.btnPrimary, marginTop: '1.25rem', width: '100%', padding: '0.85rem 1.35rem', fontSize: '0.95rem' }}>
+                      💾 Simpan Semua Kelas
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ==================== MODAL EDIT/DETAIL KELAS ==================== */}
+          {showEditModal && editingKelas && (
+            <div style={styles.modal} onClick={() => { setShowEditModal(false); setEditingKelas(null); setEditingDosenSearch(''); setShowDosenDropdown(false); }}>
+              <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                <div style={styles.modalHeaderBar}>
+                  <h3 style={styles.modalTitle}>{editingKelas.isDetailOnly ? '📋 Detail Kelas' : '✏️ Edit Kelas'}</h3>
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={styles.label}>Display Name:</label>
-                  <input
-                    type="text"
-                    value={editingKelas.display_name || ''}
-                    disabled
-                    style={{ ...styles.select, backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
-                  />
-                  <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.5rem' }}>
-                  </p>
-                </div>
+                <div style={styles.modalBody}>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={styles.label}>Nama Kelas</label>
+                    <input
+                      type="text"
+                      value={editingKelas.nama_kelas || ''}
+                      disabled
+                      style={{ ...styles.input, width: '100%', boxSizing: 'border-box', backgroundColor: '#F3F5FA', cursor: 'not-allowed' }}
+                    />
+                  </div>
 
-                {/* Preferences Dosen */}
-                {editingKelas.dosen && (
-                  <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bee3f8' }}>
-                    <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '0.95rem', fontWeight: '600', color: '#2c5aa0' }}>
-                      ⚙️ Preferensi Dosen
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
-                      <div>
-                        <span style={{ color: '#666', fontWeight: '500' }}>Lantai:</span>
-                        <p style={{ margin: '0.25rem 0 0 0', color: editingKelas.prefer_lantai ? '#2d3748' : '#a0aec0' }}>
-                          {editingKelas.prefer_lantai || '—'}
-                        </p>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={styles.label}>Mata Kuliah</label>
+                    <input
+                      type="text"
+                      value={editingKelas.f_namamk || ''}
+                      disabled
+                      style={{ ...styles.input, width: '100%', boxSizing: 'border-box', backgroundColor: '#F3F5FA', cursor: 'not-allowed' }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1.25rem', position: 'relative' }}>
+                    <label style={styles.label}>Dosen</label>
+                    <input
+                      type="text"
+                      value={editingKelas.dosen || ''}
+                      onChange={editingKelas.isDetailOnly ? undefined : (e) => handleEditDosenChange(e.target.value)}
+                      onFocus={editingKelas.isDetailOnly ? undefined : () => setShowDosenDropdown(true)}
+                      onBlur={editingKelas.isDetailOnly ? undefined : () => setTimeout(() => setShowDosenDropdown(false), 200)}
+                      placeholder="Ketik atau pilih dosen..."
+                      disabled={editingKelas.isDetailOnly}
+                      style={{
+                        ...styles.input,
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        backgroundColor: editingKelas.isDetailOnly ? '#F3F5FA' : undefined,
+                        cursor: editingKelas.isDetailOnly ? 'not-allowed' : 'text',
+                      }}
+                    />
+
+                    {!editingKelas.isDetailOnly && showDosenDropdown && (
+                      <div style={styles.dosenDropdownModal}>
+                        {dosenList
+                          .filter(d => d.f_namapegawai.toLowerCase().includes(editingDosenSearch.toLowerCase()))
+                          .map((d) => (
+                            <div
+                              key={d.id}
+                              onClick={() => handleSelectDosenFromDropdown(d.f_namapegawai)}
+                              style={styles.dropdownItem}
+                              title={d.f_namapegawai}
+                            >
+                              <div style={styles.dropdownTitle}>{d.f_namapegawai}</div>
+                              {d.f_title_depan && (
+                                <div style={styles.dropdownSubtitle}>
+                                  {d.f_title_depan} {d.f_title_belakang || ''}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        {dosenList.filter(d => d.f_namapegawai.toLowerCase().includes(editingDosenSearch.toLowerCase())).length === 0 && (
+                          <div style={{ ...styles.dropdownItem, textAlign: 'center', color: '#B7BEC9' }}>
+                            Tidak ada dosen yang cocok
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <span style={{ color: '#666', fontWeight: '500' }}>Hari Diinginkan:</span>
-                        <p style={{ margin: '0.25rem 0 0 0', color: editingKelas.prefer_hari ? '#2d3748' : '#a0aec0' }}>
-                          {editingKelas.prefer_hari || '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <span style={{ color: '#666', fontWeight: '500' }}>Hari Dihindari:</span>
-                        <p style={{ margin: '0.25rem 0 0 0', color: editingKelas.avoid_hari ? '#2d3748' : '#a0aec0' }}>
-                          {editingKelas.avoid_hari || '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <span style={{ color: '#666', fontWeight: '500' }}>Jam Mulai:</span>
-                        <p style={{ margin: '0.25rem 0 0 0', color: editingKelas.prefer_jam_mulai ? '#2d3748' : '#a0aec0' }}>
-                          {editingKelas.prefer_jam_mulai || '—'}
-                        </p>
-                      </div>
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span style={{ color: '#666', fontWeight: '500' }}>Jam Selesai:</span>
-                        <p style={{ margin: '0.25rem 0 0 0', color: editingKelas.prefer_jam_selesai ? '#2d3748' : '#a0aec0' }}>
-                          {editingKelas.prefer_jam_selesai || '—'}
-                        </p>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={styles.label}>Display Name</label>
+                    <input
+                      type="text"
+                      value={editingKelas.display_name || ''}
+                      disabled
+                      style={{ ...styles.input, width: '100%', boxSizing: 'border-box', backgroundColor: '#F3F5FA', cursor: 'not-allowed' }}
+                    />
+                  </div>
+
+                  {editingKelas.dosen && (
+                    <div style={styles.presetInfo}>
+                      <strong>⚙️ Preferensi Dosen</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+                        <div>
+                          <span style={{ color: '#C15A00', fontWeight: '500' }}>Lantai:</span>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#A85400' }}>{editingKelas.prefer_lantai || '—'}</p>
+                        </div>
+                        <div>
+                          <span style={{ color: '#C15A00', fontWeight: '500' }}>Hari Diinginkan:</span>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#A85400' }}>{editingKelas.prefer_hari || '—'}</p>
+                        </div>
+                        <div>
+                          <span style={{ color: '#C15A00', fontWeight: '500' }}>Hari Dihindari:</span>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#A85400' }}>{editingKelas.avoid_hari || '—'}</p>
+                        </div>
+                        <div>
+                          <span style={{ color: '#C15A00', fontWeight: '500' }}>Jam Mulai:</span>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#A85400' }}>{editingKelas.prefer_jam_mulai || '—'}</p>
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <span style={{ color: '#C15A00', fontWeight: '500' }}>Jam Selesai:</span>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#A85400' }}>{editingKelas.prefer_jam_selesai || '—'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              <div style={styles.modalFooter}>
-                <button
-                  style={styles.btnSecondary}
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingKelas(null);
-                    setEditingDosenSearch('');
-                    setShowDosenDropdown(false);
-                  }}
-                >
-                  {editingKelas.isDetailOnly ? '✕ Tutup' : '❌ Batal'}
-                </button>
-                {!editingKelas.isDetailOnly && (
-                  <button
-                    style={styles.btnSuccess}
-                    onClick={handleSaveEdit}
-                  >
-                    💾 Simpan Perubahan
-                  </button>
-                )}
+                  <div style={styles.modalActions}>
+                    <button
+                      style={styles.btnSecondary}
+                      onClick={() => { setShowEditModal(false); setEditingKelas(null); setEditingDosenSearch(''); setShowDosenDropdown(false); }}
+                    >
+                      {editingKelas.isDetailOnly ? '✕ Tutup' : '❌ Batal'}
+                    </button>
+                    {!editingKelas.isDetailOnly && (
+                      <button style={styles.btnPrimary} onClick={handleSaveEdit}>
+                        💾 Simpan Perubahan
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+
+// ── Edumy-inspired design tokens (shared with DosenPage) ──────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
 
 const styles = {
 
   // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f4f6fb',
+    background: '#F3F5FA',
     padding: '2rem',
-    fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
   },
 
-  // ── Main white card ───────────────────────────────────────
-  card: {
+  pageWrap: {
     maxWidth: '1400px',
     margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.09)',
-    overflow: 'hidden',
   },
 
-  // ── Gradient title bar ────────────────────────────────────
-  titleBar: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.25rem 2rem',
+  // ── Header / breadcrumb ─────────────────────────────────────
+  pageHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: '1.5rem',
+    gap: '1rem',
+    flexWrap: 'wrap',
+  },
+  breadcrumb: {
+    fontSize: '0.8rem',
+    color: '#9AA5BC',
+    fontWeight: '500',
+    marginBottom: '0.5rem',
+  },
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
+  },
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
   },
   title: {
-    fontSize: '1.5rem',
+    fontSize: '1.9rem',
     fontWeight: '700',
-    color: '#000000',
+    color: '#1E2A45',
     margin: 0,
-    letterSpacing: '0.02em',
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
   },
-  titleBreadcrumb: {
-    fontSize: '0.82rem',
-    color: 'rgba(255,255,255,0.72)',
-    margin: 0,
+  subtitle: {
+    fontSize: '0.9rem',
+    color: '#8A96AD',
+    margin: '0.35rem 0 0 0',
   },
-  cardBody: {
-    padding: '2rem',
-  },
-
-  // ── Alert messages ────────────────────────────────────────
-  message: {
-    padding: '0.9rem 1.25rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    fontWeight: '500',
-    fontSize: '0.875rem',
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
   },
-  messageSuccess: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-    border: '1px solid #a5d6a7',
-  },
-  messageError: {
-    backgroundColor: '#fce4ec',
-    color: '#b71c1c',
-    border: '1px solid #ef9a9a',
+  headerIcon: {
+    fontSize: '1.6rem',
   },
 
-  // ── Toolbar ───────────────────────────────────────────────
-  toolbar: {
+  // ── Stat widgets ────────────────────────────────────────────
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '1.1rem',
+    marginBottom: '1.5rem',
+  },
+  statCard: {
     display: 'flex',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: '1rem',
-    marginBottom: '1.5rem',
-    padding: '1rem 1.25rem',
-    backgroundColor: '#f8f9fe',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
-  },
-  toolbarLeft: {
-    display: 'flex',
-    gap: '0.65rem',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-
-  // ── Tab active/inactive states ────────────────────────────
-  activeTab: {
-    opacity: 1,
-    boxShadow: '0 2px 8px rgba(123,31,162,0.3)',
-  },
-  inactiveTab: {
-    opacity: 0.6,
-  },
-
-  // ── Form label ────────────────────────────────────────────
-  label: {
-    display: 'block',
-    marginBottom: '0.4rem',
-    fontWeight: '700',
-    color: '#000000',
-    fontSize: '0.78rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  },
-
-  // ── Select input ──────────────────────────────────────────
-  select: {
-    padding: '0.7rem 0.9rem',
-    borderRadius: '8px',
-    border: '1.5px solid #e8eaf6',
-    fontSize: '0.875rem',
     backgroundColor: 'white',
-    cursor: 'pointer',
-    width: '100%',
-    transition: 'border-color 0.2s',
-    color: '#000000',
-    outline: 'none',
+    borderRadius: '16px',
+    padding: '1.15rem 1.25rem',
+    boxShadow: '0 4px 18px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+  },
+  statIcon: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.25rem',
+    flexShrink: 0,
+  },
+  statNumber: {
+    fontSize: '1.45rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+    lineHeight: 1.1,
+  },
+  statLabel: {
+    fontSize: '0.8rem',
+    color: '#8A96AD',
+    fontWeight: '500',
+    marginTop: '0.15rem',
+  },
+
+  // ── Main card ────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '1.75rem',
   },
 
   // ── Master filter strip ───────────────────────────────────
   masterFilter: {
     marginBottom: '1.25rem',
-    padding: '1.25rem 1.5rem',
-    backgroundColor: '#f3e5f5',
-    borderRadius: '10px',
-    borderLeft: '4px solid #7b1fa2',
+    padding: '1.1rem 1.25rem',
+    backgroundColor: '#FFF6EC',
+    borderRadius: '14px',
+    borderLeft: '4px solid #FF7A00',
   },
   filterLabel: {
     display: 'block',
     marginBottom: '0.6rem',
-    fontWeight: '700',
-    color: '#4a148c',
-    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#C15A00',
+    fontSize: '0.85rem',
   },
 
   // ── Sub-filters grid ──────────────────────────────────────
   subFilters: {
     marginBottom: '1.25rem',
-    padding: '1.25rem 1.5rem',
-    backgroundColor: '#fafbff',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
+    padding: '1.1rem 1.25rem',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '1rem',
@@ -1500,277 +1398,275 @@ const styles = {
   // ── Semester toggle buttons ───────────────────────────────
   semesterToggleGroup: {
     display: 'flex',
-    gap: '0.65rem',
+    gap: '0.6rem',
     marginBottom: '0.5rem',
   },
   toggleButton: {
     flex: 1,
-    padding: '0.65rem 1rem',
-    borderRadius: '8px',
-    border: '2px solid #e8eaf6',
-    fontSize: '0.85rem',
+    padding: '0.6rem 1rem',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.82rem',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   toggleButtonActive: {
-    backgroundColor: '#7b1fa2',
-    backgroundImage: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
-    borderColor: '#7b1fa2',
-    boxShadow: '0 4px 12px rgba(123,31,162,0.35)',
+    borderColor: '#FF7A00',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
   },
   toggleButtonInactive: {
     backgroundColor: 'white',
-    color: '#607d8b',
-    borderColor: '#e8eaf6',
+    color: '#5B6A88',
+    borderColor: '#E4E8F1',
   },
 
-  // ── Search / select input ─────────────────────────────────
-  selectInput: {
-    width: '100%',
+  // ── Toolbar ────────────────────────────────────────────────
+  toolbar: {
+    marginBottom: '1.5rem',
+    paddingBottom: '1.25rem',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  toolbarLeft: {
+    display: 'flex',
+    gap: '0.7rem',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+
+  // ── Buttons (Edumy pill style) ──────────────────────────────
+  btnPrimary: {
+    padding: '0.6rem 1.35rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
+    transition: 'opacity 0.2s, transform 0.1s',
+  },
+  btnPrimarySmall: {
+    padding: '0.5rem 1.1rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+  },
+  btnOutlineTeal: {
+    padding: '0.6rem 1.35rem',
+    background: '#E4F7F0',
+    color: '#0E9B6E',
+    border: '1px solid #C3EEDF',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s, transform 0.1s',
+  },
+  btnDanger: {
+    padding: '0.6rem 1.35rem',
+    background: '#FDEBEE',
+    color: '#E5484D',
+    border: '1px solid #F8CDD3',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s, transform 0.1s',
+  },
+  btnSecondary: {
+    padding: '0.6rem 1.35rem',
+    background: '#F3F5FA',
+    color: '#5B6A88',
+    border: '1px solid #E4E8F1',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  },
+
+  // ── Inputs ─────────────────────────────────────────────────
+  input: {
     padding: '0.7rem 0.9rem',
-    borderRadius: '8px',
-    border: '1.5px solid #e8eaf6',
-    fontSize: '0.875rem',
-    color: '#37474f',
-    boxSizing: 'border-box',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.9rem',
+    color: '#1E2A45',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
     outline: 'none',
+  },
+  select: {
+    padding: '0.7rem 0.9rem',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.875rem',
+    backgroundColor: '#FFFFFF',
+    cursor: 'pointer',
+    width: '100%',
     transition: 'border-color 0.2s',
+    color: '#1E2A45',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  label: {
+    display: 'block',
+    marginBottom: '0.45rem',
+    fontWeight: '600',
+    color: '#5B6A88',
+    fontSize: '0.78rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
 
   // ── Dropdown panel ────────────────────────────────────────
   dropdown: {
     maxHeight: '250px',
     overflowY: 'auto',
-    border: '1.5px solid #e8eaf6',
+    border: '1.5px solid #E4E8F1',
     borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
+    borderRadius: '0 0 10px 10px',
     backgroundColor: 'white',
-    position: 'relative',
+    position: 'absolute',
+    left: 0,
+    right: 0,
     zIndex: 10,
-    boxShadow: '0 6px 16px rgba(0,0,0,0.1)',
+    boxShadow: '0 10px 24px rgba(30,42,69,0.12)',
   },
   dropdownItem: {
     padding: '0.75rem 1rem',
-    borderBottom: '1px solid #f0f2ff',
+    borderBottom: '1px solid #F3F5FA',
     cursor: 'pointer',
     backgroundColor: 'white',
     transition: 'background-color 0.15s',
   },
   dropdownItemActive: {
-    backgroundColor: '#f3e5f5',
+    backgroundColor: '#FFF6EC',
   },
   dropdownTitle: {
     fontWeight: '700',
-    color: '#4527a0',
+    color: '#C15A00',
     fontSize: '0.875rem',
   },
   dropdownSubtitle: {
     fontSize: '0.825rem',
-    color: '#546e7a',
+    color: '#42506B',
     marginTop: '0.2rem',
   },
   dropdownDetail: {
     fontSize: '0.75rem',
-    color: '#90a4ae',
+    color: '#8A96AD',
     marginTop: '0.2rem',
   },
   dropdownEmpty: {
     padding: '1rem',
-    border: '1.5px solid #e8eaf6',
+    border: '1.5px solid #E4E8F1',
     borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
-    color: '#90a4ae',
+    borderRadius: '0 0 10px 10px',
+    color: '#8A96AD',
     textAlign: 'center',
     fontSize: '0.875rem',
   },
 
+  // ── Notice boxes (info / warning) ─────────────────────────
+  noticeInfo: {
+    padding: '0.85rem 1.1rem',
+    marginBottom: '1.5rem',
+    backgroundColor: '#E4F7F0',
+    borderLeft: '4px solid #12B886',
+    borderRadius: '10px',
+    fontSize: '0.9rem',
+    color: '#0E9B6E',
+  },
+  noticeWarning: {
+    padding: '0.9rem 1.1rem',
+    marginBottom: '1.5rem',
+    backgroundColor: '#FFF6EC',
+    borderLeft: '4px solid #FF7A00',
+    borderRadius: '10px',
+    fontSize: '0.9rem',
+    color: '#C15A00',
+  },
+
   // ── Selected item info bar ────────────────────────────────
   selectedInfo: {
-    backgroundColor: '#f3e5f5',
+    backgroundColor: '#FFF6EC',
     padding: '1rem 1.25rem',
-    borderRadius: '10px',
+    borderRadius: '14px',
     marginBottom: '1.5rem',
-    borderLeft: '4px solid #7b1fa2',
-    color: '#000000',
+    borderLeft: '4px solid #FF7A00',
+    color: '#1E2A45',
   },
   infoBadge: {
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     padding: '0.25rem 0.85rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
     letterSpacing: '0.02em',
   },
 
-  // ── Buttons ───────────────────────────────────────────────
-  btnPrimary: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(123,31,162,0.3)',
-    transition: 'opacity 0.2s, transform 0.1s',
-  },
-  btnSuccess: {
-    padding: '0.75rem 1.5rem',
-    background: 'linear-gradient(135deg, #00897b, #00695c)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(0,137,123,0.3)',
-    transition: 'opacity 0.2s, transform 0.1s',
-    marginTop: '1.5rem',
-    width: '100%',
-  },
-  btnSecondary: {
-    padding: '0.65rem 1.25rem',
-    background: 'linear-gradient(135deg, #1e88e5, #1565c0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(30,136,229,0.3)',
-    transition: 'opacity 0.2s, transform 0.1s',
-  },
-  btnIconDanger: {
-    background: '#fce4ec',
-    border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
-    color: '#b71c1c',
-  },
-
-  modalContentSmall: {
-    background: 'white',
-    borderRadius: '14px',
-    width: '360px',
-    maxWidth: '90vw',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-    overflow: 'hidden',
-    padding: '2rem',
-    textAlign: 'center',
-  },
-  popupTitle: {
-    fontSize: '2.5rem',
-    margin: '0 0 1rem 0',
-    lineHeight: 1,
-  },
-  popupText: {
-    fontSize: '0.95rem',
-    color: '#37474f',
-    margin: '0 0 1.5rem 0',
-    lineHeight: '1.5',
-    whiteSpace: 'pre-line',
-  },
-  btnClose: {
-    padding: '0.6rem 1.5rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-  },
-
-  btnExpand: {
-    background: '#ede7f6',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    padding: '0.25rem 0.5rem',
-    color: '#7b1fa2',
-    fontWeight: '700',
-    transition: 'background 0.2s',
-    width: '30px',
-    height: '30px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '6px',
-  },
-  btnEditSmall: {
-    padding: '0.35rem 0.75rem',
-    background: 'linear-gradient(135deg, #00897b, #00695c)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-    whiteSpace: 'nowrap',
-  },
-  btnDeleteSmall: {
-    padding: '0.35rem 0.6rem',
-    background: 'linear-gradient(135deg, #e53935, #b71c1c)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-    whiteSpace: 'nowrap',
-  },
-
-  // ── Table section ─────────────────────────────────────────
+  // ── Table section ──────────────────────────────────────────
   tableWrapper: {
-    marginTop: '1.5rem',
+    marginTop: '0.25rem',
   },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '0.75rem',
-    padding: '0 0.25rem',
-    color: '#37474f',
+    marginBottom: '0.9rem',
+    padding: '0 0.1rem',
+    flexWrap: 'wrap',
+    gap: '0.75rem',
   },
-  badge: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
-    padding: '0.25rem 0.85rem',
-    borderRadius: '20px',
-    fontSize: '0.8rem',
-    fontWeight: '600',
+  tableTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+  },
+  badgeCount: {
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
+    padding: '0.3rem 0.9rem',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '700',
     letterSpacing: '0.02em',
   },
+
+  // ── Empty / loading states ─────────────────────────────────
   emptyState: {
     textAlign: 'center',
     padding: '3.5rem 2rem',
-    backgroundColor: '#fafbff',
-    borderRadius: '12px',
-    color: '#90a4ae',
-    border: '2px dashed #e8eaf6',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    color: '#9AA5BC',
+    border: '2px dashed #E4E8F1',
   },
   emptyIcon: {
     fontSize: '3rem',
     display: 'block',
     marginBottom: '1rem',
   },
+
+  // ── Table ──────────────────────────────────────────────────
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
+    marginBottom: '1rem',
   },
   table: {
     width: '100%',
@@ -1778,112 +1674,170 @@ const styles = {
     backgroundColor: 'white',
   },
   tableHeaderRow: {
-    background: 'linear-gradient(135deg, #7b1fa2 0%, #4527a0 100%)',
+    backgroundColor: '#FAFBFF',
   },
   th: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     textAlign: 'left',
     fontWeight: '700',
-    color: '#ffffff',
-    fontSize: '0.78rem',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  sortIcon: {
+    color: '#FF7A00',
+    fontWeight: '700',
+  },
+  thAksi: {
+    padding: '0.85rem 1rem',
+    textAlign: 'center',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    borderBottom: '1px solid #EEF1F8',
   },
   td: {
     padding: '0.85rem 1rem',
-    color: '#37474f',
+    color: '#42506B',
     fontSize: '0.875rem',
     verticalAlign: 'middle',
   },
+  tdAksi: {
+    padding: '0.85rem 1rem',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    verticalAlign: 'middle',
+  },
   tableRow: {
-    borderBottom: '1px solid #f0f2ff',
+    borderBottom: '1px solid #F3F5FA',
     transition: 'background-color 0.15s',
   },
-  tableRowEven: {
-    backgroundColor: '#fafbff',
-    borderBottom: '1px solid #f0f2ff',
-  },
 
-  // ── Data badges ───────────────────────────────────────────
+  // ── Data badges (pill style) ────────────────────────────────
   badgeCode: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
+    backgroundColor: '#EDEBFF',
+    color: '#5B4FE0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '700',
     display: 'inline-block',
+    fontFamily: 'monospace',
     letterSpacing: '0.03em',
   },
-  sksBadge: {
-    backgroundColor: '#e0f2f1',
-    color: '#004d40',
+  badgeSks: {
+    backgroundColor: '#E4F7F0',
+    color: '#0E9B6E',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '700',
     display: 'inline-block',
   },
-  semesterBadge: {
-    backgroundColor: '#fff3e0',
-    color: '#e65100',
+  badgeSemester: {
+    backgroundColor: '#E7EEFF',
+    color: '#3E5EF0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '700',
     display: 'inline-block',
   },
   classBadge: {
     marginLeft: '0.65rem',
-    backgroundColor: '#fff3e0',
-    color: '#e65100',
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
     padding: '0.15rem 0.65rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.75rem',
     fontWeight: '600',
     display: 'inline-block',
   },
   badgeKelas: {
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
   },
 
+  // ── Row action icon-buttons ────────────────────────────────
+  btnExpand: {
+    background: '#FFEEDD',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    padding: '0.3rem 0.5rem',
+    color: '#C15A00',
+    fontWeight: '700',
+    transition: 'background 0.2s',
+    width: '30px',
+    height: '30px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '10px',
+  },
+  btnIconInfo: {
+    background: '#FFEEDD',
+    border: 'none',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
+    transition: 'background 0.2s',
+    marginRight: '0.4rem',
+    color: '#C15A00',
+  },
+  btnIconDanger: {
+    background: '#FDEBEE',
+    border: 'none',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
+    transition: 'background 0.2s',
+    color: '#E5484D',
+  },
+
   // ── Expanded kelas sub-table ──────────────────────────────
   expandedContent: {
-    padding: '0.75rem',
-    backgroundColor: '#fafbff',
+    padding: '0.5rem',
   },
   expandedTitle: {
     margin: '0 0 0.75rem 0',
-    fontSize: '0.9rem',
+    fontSize: '0.95rem',
     fontWeight: '700',
-    color: '#4a148c',
+    color: '#C15A00',
+    fontFamily: "'Poppins', sans-serif",
   },
   classesTable: {
     backgroundColor: 'white',
-    borderRadius: '8px',
-    border: '1px solid #e8eaf6',
+    borderRadius: '12px',
+    border: '1px solid #EEF1F8',
     overflow: 'hidden',
   },
   classesTableHeader: {
     display: 'flex',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-    borderBottom: '2px solid #4527a0',
+    background: '#FAFBFF',
+    borderBottom: '1px solid #EEF1F8',
     padding: '0.65rem 1rem',
     gap: '1rem',
+    color: '#5B6A88',
   },
   classesTableRow: {
     display: 'flex',
     padding: '0.65rem 1rem',
-    borderBottom: '1px solid #f0f2ff',
+    borderBottom: '1px solid #F3F5FA',
     alignItems: 'center',
     gap: '1rem',
     backgroundColor: 'white',
@@ -1893,126 +1847,125 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     fontSize: '0.875rem',
-    color: '#37474f',
-  },
-  classNumber: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
-    borderRadius: '50%',
-    width: '28px',
-    height: '28px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: '700',
-    fontSize: '0.82rem',
+    color: '#42506B',
   },
 
-  // ── Modal ─────────────────────────────────────────────────
-  modalOverlay: {
+  // ── Preset / preference info block ─────────────────────────
+  presetInfo: {
+    backgroundColor: '#FFF6EC',
+    padding: '1rem 1.25rem',
+    borderRadius: '14px',
+    marginBottom: '1.25rem',
+    fontSize: '0.9rem',
+    color: '#A85400',
+    borderLeft: '4px solid #FF7A00',
+    fontWeight: '500',
+  },
+
+  // ── Modal overlay + content (shared with DosenPage) ────────
+  modal: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(30,10,50,0.55)',
+    background: 'rgba(20,24,40,0.5)',
     backdropFilter: 'blur(3px)',
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1000,
   },
-  modal: {
-    backgroundColor: 'white',
-    borderRadius: '14px',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-    maxWidth: '520px',
-    width: '90%',
+  modalContent: {
+    background: 'white',
+    borderRadius: '20px',
+    minWidth: '600px',
+    maxWidth: '90vw',
     maxHeight: '90vh',
-    overflow: 'hidden',
-    animation: 'slideUp 0.25s ease-out',
+    overflowY: 'auto',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
   },
-  modalHeader: {
-    padding: '1.1rem 1.75rem',
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  modalHeaderBar: {
+    padding: '1.25rem 1.75rem',
+    borderBottom: '1px solid #EEF1F8',
+    background: '#FAFBFF',
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px',
+  },
+  modalTitle: {
+    fontSize: '1.15rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
   modalBody: {
     padding: '1.75rem',
-    overflowY: 'auto',
   },
-  modalFooter: {
-    padding: '1.1rem 1.75rem',
-    borderTop: '1px solid #f0f2ff',
+  modalActions: {
     display: 'flex',
     gap: '0.75rem',
     justifyContent: 'flex-end',
-    backgroundColor: '#fafbff',
-  },
-  btnClose: {
-    background: 'rgba(255,255,255,0.2)',
-    border: 'none',
-    fontSize: '1.2rem',
-    cursor: 'pointer',
-    color: 'white',
-    padding: '0.2rem 0.6rem',
-    borderRadius: '6px',
-    lineHeight: 1,
-    transition: 'background 0.2s',
+    marginTop: '1.5rem',
+    paddingTop: '1.25rem',
+    borderTop: '1px solid #EEF1F8',
   },
 
-  // ── Dosen dropdown inside modal ───────────────────────────
+  // ── Dosen dropdown inside modal ────────────────────────────
   dosenDropdownModal: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
     backgroundColor: 'white',
-    border: '1.5px solid #e8eaf6',
+    border: '1.5px solid #E4E8F1',
     borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
+    borderRadius: '0 0 10px 10px',
     maxHeight: '200px',
     overflowY: 'auto',
     zIndex: 20,
-    boxShadow: '0 6px 16px rgba(0,0,0,0.1)',
+    boxShadow: '0 10px 24px rgba(30,42,69,0.12)',
   },
-  dosenDropdownItem: {
-    padding: '0.75rem 1rem',
-    borderBottom: '1px solid #f0f2ff',
+
+  // ── Popup Modal (message + import stats) ───────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '20px',
+    minWidth: '350px',
+    maxWidth: '85vw',
+    padding: '2rem',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
+    textAlign: 'center',
+  },
+  popupIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  popupText: {
+    color: '#1E2A45',
+    fontSize: '1rem',
+    fontWeight: '500',
+    marginBottom: '1.5rem',
+    lineHeight: '1.5',
+  },
+  popupSuccess: {
+    backgroundColor: '#F0FBF6',
+    borderLeft: '4px solid #12B886',
+  },
+  popupError: {
+    backgroundColor: '#FDF1F2',
+    borderLeft: '4px solid #E5484D',
+  },
+  btnClose: {
+    padding: '0.6rem 1.6rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '999px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
     cursor: 'pointer',
-    backgroundColor: 'white',
-    transition: 'background-color 0.15s',
-  },
-  dosenNameModal: {
-    fontWeight: '700',
-    color: '#37474f',
-    fontSize: '0.875rem',
-  },
-  dosenTitleModal: {
-    fontSize: '0.8rem',
-    color: '#90a4ae',
-    marginTop: '0.2rem',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+    transition: 'opacity 0.2s',
   },
 };
-
-// ── Global styles (hover, focus, animation) ───────────────
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.textContent = `
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    button:hover { opacity: 0.88; transform: translateY(-1px); }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #7b1fa2 !important;
-      box-shadow: 0 0 0 3px rgba(123,31,162,0.12);
-    }
-    input:hover, select:hover { border-color: #ce93d8; }
-    tr:hover { background-color: #f3e5f5 !important; }
-  `;
-  document.head.appendChild(styleSheet);
-}
