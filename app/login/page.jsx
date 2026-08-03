@@ -41,6 +41,40 @@ export default function LoginPage() {
     checkSession();
   }, [router]);
 
+  // Add font import on client side only (matches DosenPage)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
+      button:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      input:hover {
+        border-color: #FF7A00 !important;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -101,130 +135,143 @@ export default function LoginPage() {
   };
 
   if (checkingSession) {
-    return <div style={styles.loadingContainer}>Memuat...</div>;
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingCard}>
+          <span style={styles.loadingIcon}>⏳</span>
+          <p style={styles.loadingText}>Memuat...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>📊 Matriks Kelas</h1>
-        <p style={styles.subtitle}>Sistem Penjadwalan Kelas</p>
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Role Selection */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Pilih Role:</label>
-            <div style={styles.roleButtons}>
-              <button
-                type="button"
-                onClick={() => {
-                  setRole('admin');
-                  setError('');
-                }}
-                style={{
-                  ...styles.roleButton,
-                  ...(role === 'admin' ? styles.roleButtonActive : {}),
-                }}
-              >
-                👨‍💼 Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setRole('dosen');
-                  setError('');
-                }}
-                style={{
-                  ...styles.roleButton,
-                  ...(role === 'dosen' ? styles.roleButtonActive : {}),
-                }}
-              >
-                👨‍🏫 Dosen
-              </button>
+      <div style={styles.pageWrap}>
+        <div style={styles.card}>
+          {/* Header */}
+          <div style={styles.cardHeader}>
+            <div style={styles.headerIconWrap}>
+              <span style={styles.headerIcon}>🎓</span>
+            </div>
+            <div>
+              <div style={styles.breadcrumb}>
+                Matriks Kelas <span style={styles.breadcrumbSep}>/</span>{' '}
+                <span style={styles.breadcrumbActive}>Masuk</span>
+              </div>
+              <h1 style={styles.title}>Selamat Datang</h1>
+              <p style={styles.subtitle}>Sistem Penjadwalan Kelas</p>
             </div>
           </div>
 
-          {/* Admin Login Form */}
-          {role === 'admin' && (
-            <>
+          <form onSubmit={handleSubmit} style={styles.form}>
+            {/* Role Selection */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Pilih Role</label>
+              <div style={styles.roleButtons}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRole('admin');
+                    setError('');
+                  }}
+                  style={role === 'admin' ? styles.roleButtonActive : styles.roleButton}
+                >
+                  👨‍💼 Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRole('dosen');
+                    setError('');
+                  }}
+                  style={role === 'dosen' ? styles.roleButtonActive : styles.roleButton}
+                >
+                  👨‍🏫 Dosen
+                </button>
+              </div>
+            </div>
+
+            {/* Admin Login Form */}
+            {role === 'admin' && (
+              <>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Username</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Contoh: admin"
+                    style={styles.input}
+                    required
+                  />
+                  <small style={styles.hint}>Dummy: admin</small>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Masukkan password"
+                    style={styles.input}
+                    required
+                  />
+                  <small style={styles.hint}>Dummy: admin123</small>
+                </div>
+              </>
+            )}
+
+            {/* Dosen Login Form */}
+            {role === 'dosen' && (
               <div style={styles.formGroup}>
-                <label style={styles.label}>Username:</label>
+                <label style={styles.label}>NIDN</label>
                 <input
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Contoh: admin"
+                  value={nidn}
+                  onChange={(e) => setNidn(e.target.value)}
+                  placeholder="Masukkan NIDN Anda"
                   style={styles.input}
                   required
                 />
-                <small style={styles.hint}>Dummy: admin</small>
+                <small style={styles.hint}>NIDN harus terdaftar di database</small>
               </div>
+            )}
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Password:</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Masukkan password"
-                  style={styles.input}
-                  required
-                />
-                <small style={styles.hint}>Dummy: admin123</small>
+            {/* Error Message */}
+            {error && (
+              <div style={styles.error}>
+                <span>❌</span> {error}
               </div>
-            </>
-          )}
+            )}
 
-          {/* Dosen Login Form */}
-          {role === 'dosen' && (
-            <div style={styles.formGroup}>
-              <label style={styles.label}>NIDN:</label>
-              <input
-                type="text"
-                value={nidn}
-                onChange={(e) => setNidn(e.target.value)}
-                placeholder="Masukkan NIDN Anda"
-                style={styles.input}
-                required
-              />
-              <small style={styles.hint}>
-                NIDN harus terdaftar di database
-              </small>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                ...styles.btnPrimary,
+                ...(loading ? styles.btnPrimaryDisabled : {}),
+              }}
+            >
+              {loading ? '⏳ Mengecek...' : '🔓 Masuk'}
+            </button>
+          </form>
+
+          {/* Info Box */}
+          <div style={styles.infoBox}>
+            <strong style={styles.infoTitle}>🔐 Akun Demo</strong>
+            <div style={styles.infoContent}>
+              <div style={styles.infoRow}>
+                <span style={styles.badgeCode}>Admin</span>
+                <span>Username: admin &nbsp;·&nbsp; Password: admin123</span>
+              </div>
+              <div style={styles.infoRow}>
+                <span style={styles.badgeProdi}>Dosen</span>
+                <span>Gunakan NIDN dari database</span>
+              </div>
             </div>
-          )}
-
-          {/* Error Message */}
-          {error && <div style={styles.error}>{error}</div>}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              ...styles.submitButton,
-              ...(loading ? styles.submitButtonDisabled : {}),
-            }}
-          >
-            {loading ? 'Mengecek...' : 'Masuk'}
-          </button>
-        </form>
-
-        {/* Info Box */}
-        <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>🔐 Akun Demo</h3>
-          <div style={styles.infoContent}>
-            <p>
-              <strong>Admin:</strong>
-              <br />
-              Username: admin
-              <br />
-              Password: admin123
-            </p>
-            <p>
-              <strong>Dosen:</strong>
-              <br />
-              Gunakan NIDN dari database
-            </p>
           </div>
         </div>
       </div>
@@ -232,131 +279,249 @@ export default function LoginPage() {
   );
 }
 
+// ── Edumy-inspired design tokens (matches DosenPage) ──────────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
+
 const styles = {
+  // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
+    background: '#F3F5FA',
+    padding: '2rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '1rem',
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
   },
-  card: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '2.5rem',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-    maxWidth: '400px',
+  pageWrap: {
     width: '100%',
+    maxWidth: '440px',
+  },
+
+  // ── Card ─────────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '2rem',
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    marginBottom: '1.75rem',
+    paddingBottom: '1.5rem',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
+    flexShrink: 0,
+  },
+  headerIcon: {
+    fontSize: '1.6rem',
+  },
+  breadcrumb: {
+    fontSize: '0.78rem',
+    color: '#9AA5BC',
+    fontWeight: '500',
+    marginBottom: '0.35rem',
+  },
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
+  },
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
   },
   title: {
-    margin: '0 0 0.5rem 0',
-    fontSize: '1.8rem',
+    fontSize: '1.4rem',
     fontWeight: '700',
-    textAlign: 'center',
-    color: '#2d3748',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
   },
   subtitle: {
-    margin: '0 0 1.5rem 0',
-    fontSize: '0.9rem',
-    textAlign: 'center',
-    color: '#718096',
+    fontSize: '0.85rem',
+    color: '#8A96AD',
+    margin: '0.2rem 0 0 0',
   },
+
+  // ── Form ─────────────────────────────────────────────────
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.5rem',
+    gap: '1.25rem',
   },
   formGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.5rem',
+    gap: '0.4rem',
   },
   label: {
-    fontSize: '0.9rem',
     fontWeight: '600',
-    color: '#2d3748',
+    color: '#5B6A88',
+    fontSize: '0.78rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   roleButtons: {
     display: 'flex',
-    gap: '1rem',
+    gap: '0.7rem',
   },
   roleButton: {
     flex: 1,
-    padding: '0.75rem',
-    border: '2px solid #cbd5e0',
-    borderRadius: '8px',
-    background: 'white',
-    color: '#2d3748',
-    fontWeight: '500',
+    padding: '0.65rem 1rem',
+    background: '#F3F5FA',
+    color: '#5B6A88',
+    border: '1.5px solid #E4E8F1',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    fontSize: '0.9rem',
+    transition: 'all 0.2s',
   },
   roleButtonActive: {
-    borderColor: '#667eea',
-    background: '#edf2f7',
-    color: '#667eea',
+    flex: 1,
+    padding: '0.65rem 1rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: '1.5px solid transparent',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
+    transition: 'all 0.2s',
   },
   input: {
-    padding: '0.75rem',
-    border: '1px solid #cbd5e0',
-    borderRadius: '8px',
+    padding: '0.7rem 0.9rem',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
     fontSize: '0.9rem',
-    fontFamily: 'inherit',
-    color: '#000000',
+    color: '#1E2A45',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    outline: 'none',
+    fontFamily: "'Jost', sans-serif",
   },
   hint: {
     fontSize: '0.75rem',
-    color: '#a0aec0',
-    marginTop: '0.25rem',
+    color: '#9AA5BC',
   },
   error: {
-    padding: '0.75rem',
-    background: '#fed7d7',
-    color: '#c53030',
-    borderRadius: '8px',
-    fontSize: '0.9rem',
+    padding: '0.75rem 1rem',
+    background: '#FDEBEE',
+    color: '#E5484D',
+    border: '1px solid #F8CDD3',
+    borderRadius: '12px',
+    fontSize: '0.85rem',
     fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
   },
-  submitButton: {
-    padding: '0.75rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+
+  // ── Buttons ─────────────────────────────────────────────
+  btnPrimary: {
+    padding: '0.75rem 1.35rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '999px',
+    fontSize: '0.9rem',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    fontSize: '0.95rem',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
+    transition: 'opacity 0.2s, transform 0.1s',
   },
-  submitButtonDisabled: {
-    opacity: '0.6',
+  btnPrimaryDisabled: {
+    opacity: 0.6,
     cursor: 'not-allowed',
   },
+
+  // ── Info box ────────────────────────────────────────────
   infoBox: {
-    marginTop: '2rem',
-    padding: '1rem',
-    background: '#f7fafc',
-    borderRadius: '8px',
-    borderLeft: '4px solid #667eea',
+    marginTop: '1.75rem',
+    paddingTop: '1.5rem',
+    borderTop: '1px solid #EEF1F8',
   },
   infoTitle: {
-    margin: '0 0 0.75rem 0',
-    fontSize: '0.9rem',
-    color: '#2d3748',
+    fontSize: '0.85rem',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
   },
   infoContent: {
-    fontSize: '0.85rem',
-    color: '#4a5568',
+    marginTop: '0.75rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.6rem',
   },
+  infoRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.6rem',
+    fontSize: '0.82rem',
+    color: '#5B6A88',
+  },
+  badgeCode: {
+    backgroundColor: '#EDEBFF',
+    color: '#5B4FE0',
+    padding: '0.2rem 0.75rem',
+    borderRadius: '999px',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    display: 'inline-block',
+    flexShrink: 0,
+  },
+  badgeProdi: {
+    backgroundColor: '#E4F7F0',
+    color: '#0E9B6E',
+    padding: '0.2rem 0.75rem',
+    borderRadius: '999px',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    display: 'inline-block',
+    flexShrink: 0,
+  },
+
+  // ── Loading state ───────────────────────────────────────
   loadingContainer: {
     minHeight: '100vh',
+    background: '#F3F5FA',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    fontSize: '1.2rem',
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  loadingCard: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '2.5rem 3rem',
+    textAlign: 'center',
+  },
+  loadingIcon: {
+    fontSize: '2rem',
+    display: 'block',
+    marginBottom: '0.75rem',
+  },
+  loadingText: {
+    color: '#FF7A00',
+    fontSize: '1rem',
+    fontWeight: '600',
+    margin: 0,
   },
 };
