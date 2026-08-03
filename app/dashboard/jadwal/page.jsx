@@ -327,6 +327,44 @@ export default function JadwalPage() {
   useEffect(() => { if (selectedTahunAkademik && selectedSemester) { fetchKelasAndJadwalBySemester(selectedTahunAkademik, selectedSemester); } else { setKelasList([]); setJadwalData({}); } }, [selectedTahunAkademik, selectedSemester]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setSelectedJamMulai(settings.jamMulai); setCalculatedJamSelesai(calculateJamSelesai(settings.jamMulai, 1)); }, [settings.durasiSlot, activePreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Add hover styles + font import on client side only (matches DosenPage design system)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
+      button:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      input:hover, select:hover, textarea:hover {
+        border-color: #FF7A00 !important;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
+      }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
+
   const showMessage = (type, text) => {
     setMessagePopup({ show: true, type, text });
   };
@@ -743,119 +781,105 @@ export default function JadwalPage() {
     showMessage('success', 'Jadwal diexport ke XLSX');
   };
 
-  // ===== SHARED INLINE STYLES =====
+  // ===== SHARED INLINE STYLES (Edumy design system — matches DosenPage) =====
   const s = {
-    page: { minHeight: '100vh', backgroundColor: '#f4f6fb', fontFamily: "'Segoe UI','Helvetica Neue',Arial,sans-serif" },
+    page: { minHeight: '100vh', backgroundColor: '#F3F5FA', fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif" },
     inner: { maxWidth: '1400px', margin: '0 auto', padding: '0 2rem 2rem' },
     // Header
-    titleBar: { background: 'linear-gradient(135deg,#c2185b 0%,#7b1fa2 60%,#4527a0 100%)', padding: '1.25rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    titleText: { fontSize: '1.5rem', fontWeight: 700, color: '#fff', margin: 0 },
-    titleSub: { fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', margin: 0 },
+    titleBar: { padding: '2rem 2rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' },
+    breadcrumb: { fontSize: '0.8rem', color: '#9AA5BC', fontWeight: '500', marginBottom: '0.5rem' },
+    breadcrumbSep: { color: '#C7CEDD', margin: '0 0.25rem' },
+    breadcrumbActive: { color: '#FF7A00', fontWeight: '600' },
+    titleText: { fontSize: '1.9rem', fontWeight: 700, color: '#1E2A45', margin: 0, fontFamily: "'Poppins', sans-serif", letterSpacing: '-0.01em' },
+    titleSub: { fontSize: '0.9rem', color: '#8A96AD', margin: '0.35rem 0 0 0' },
+    headerIconWrap: { width: '56px', height: '56px', borderRadius: '16px', background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(255,122,0,0.28)' },
+    headerIcon: { fontSize: '1.6rem' },
     // Cards
-    card: { backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '1.5rem', overflow: 'hidden' },
-    cardHeader: { background: 'linear-gradient(135deg,#c2185b 0%,#7b1fa2 60%,#4527a0 100%)', padding: '0.9rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    cardHeaderText: { fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 },
-    cardBody: { padding: '1.5rem' },
+    card: { backgroundColor: 'white', borderRadius: '18px', boxShadow: '0 4px 22px rgba(30,42,69,0.06)', border: '1px solid #EEF1F8', marginBottom: '1.5rem', overflow: 'hidden' },
+    cardHeader: { backgroundColor: '#FAFBFF', borderBottom: '1px solid #EEF1F8', padding: '1rem 1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' },
+    cardHeaderText: { fontSize: '1rem', fontWeight: 700, color: '#1E2A45', margin: 0, fontFamily: "'Poppins', sans-serif" },
+    cardBody: { padding: '1.75rem' },
     // Alerts
-    alertSuccess: { padding: '0.85rem 1.25rem', borderRadius: '8px', marginBottom: '1.25rem', fontWeight: 500, fontSize: '0.875rem', backgroundColor: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' },
-    alertError: { padding: '0.85rem 1.25rem', borderRadius: '8px', marginBottom: '1.25rem', fontWeight: 500, fontSize: '0.875rem', backgroundColor: '#fce4ec', color: '#b71c1c', border: '1px solid #ef9a9a' },
+    alertSuccess: { padding: '0.85rem 1.25rem', borderRadius: '10px', marginBottom: '1.25rem', fontWeight: 500, fontSize: '0.875rem', backgroundColor: '#F0FBF6', color: '#0E9B6E', border: '1px solid #C3EEDF' },
+    alertError: { padding: '0.85rem 1.25rem', borderRadius: '10px', marginBottom: '1.25rem', fontWeight: 500, fontSize: '0.875rem', backgroundColor: '#FDF1F2', color: '#E5484D', border: '1px solid #F8CDD3' },
     // Inputs
-    input: { width: '100%', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1.5px solid #e8eaf6', fontSize: '0.875rem', color: '#37474f', boxSizing: 'border-box', outline: 'none', backgroundColor: 'white' },
-    inputDisabled: { width: '100%', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1.5px solid #e8eaf6', fontSize: '0.875rem', color: '#37474f', boxSizing: 'border-box', backgroundColor: '#f8f9fe' },
-    select: { width: '100%', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1.5px solid #e8eaf6', fontSize: '0.875rem', color: '#37474f', boxSizing: 'border-box', outline: 'none', backgroundColor: 'white', cursor: 'pointer' },
+    input: { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1.5px solid #E4E8F1', fontSize: '0.875rem', color: '#1E2A45', boxSizing: 'border-box', outline: 'none', backgroundColor: 'white' },
+    inputDisabled: { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1.5px solid #E4E8F1', fontSize: '0.875rem', color: '#5B6A88', boxSizing: 'border-box', backgroundColor: '#F8FAFC' },
+    select: { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1.5px solid #E4E8F1', fontSize: '0.875rem', color: '#1E2A45', boxSizing: 'border-box', outline: 'none', backgroundColor: 'white', cursor: 'pointer' },
     // Labels
-    label: { display: 'block', fontWeight: 600, fontSize: '0.78rem', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' },
-    // Buttons
-    btnPrimary: { padding: '0.55rem 1.2rem', background: 'linear-gradient(135deg,#7b1fa2,#4527a0)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 6px rgba(123,31,162,0.3)' },
-    btnSuccess: { padding: '0.55rem 1.2rem', background: 'linear-gradient(135deg,#00897b,#00695c)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,137,123,0.3)' },
-    btnPurple: { padding: '0.55rem 1.2rem', background: 'linear-gradient(135deg,#7b1fa2,#4527a0)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 6px rgba(123,31,162,0.3)' },
-    btnAmber: { padding: '0.55rem 1.2rem', background: 'linear-gradient(135deg,#f57f17,#e65100)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 6px rgba(245,127,23,0.3)' },
-    btnGray: { padding: '0.55rem 1.2rem', backgroundColor: '#eceff1', color: '#455a64', border: '1px solid #cfd8dc', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' },
-    btnGrayDisabled: { padding: '0.55rem 1.2rem', backgroundColor: '#eceff1', color: '#b0bec5', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, cursor: 'not-allowed' },
-    btnSavePreset: { padding: '0.5rem 1rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' },
-    btnPresetActive: { padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#7b1fa2,#4527a0)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(123,31,162,0.4)', fontSize: '0.875rem' },
-    btnPresetInactive: { padding: '0.5rem 1.25rem', backgroundColor: '#f8f9fe', color: '#546e7a', border: '1px solid #e8eaf6', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.875rem' },
-    btnClose: { backgroundColor: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '1.1rem', cursor: 'pointer', borderRadius: '6px', padding: '0.2rem 0.6rem', lineHeight: 1 },
+    label: { display: 'block', fontWeight: 600, fontSize: '0.78rem', color: '#5B6A88', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' },
+    // Buttons (Edumy pill style)
+    btnPrimary: { padding: '0.6rem 1.35rem', background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)', color: 'white', border: 'none', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,122,0,0.35)', transition: 'opacity 0.2s, transform 0.1s' },
+    btnSuccess: { padding: '0.6rem 1.35rem', backgroundColor: '#E4F7F0', color: '#0E9B6E', border: '1px solid #C3EEDF', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s, transform 0.1s' },
+    btnPurple: { padding: '0.6rem 1.35rem', background: 'linear-gradient(135deg, #7C86FF, #5B4FE0)', color: 'white', border: 'none', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(91,79,224,0.32)', transition: 'opacity 0.2s, transform 0.1s' },
+    btnAmber: { padding: '0.6rem 1.35rem', backgroundColor: '#FFEEDD', color: '#C15A00', border: '1px solid #FFDBA8', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s, transform 0.1s' },
+    btnGray: { padding: '0.6rem 1.35rem', backgroundColor: '#F3F5FA', color: '#5B6A88', border: '1px solid #E4E8F1', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' },
+    btnGrayDisabled: { padding: '0.6rem 1.35rem', backgroundColor: '#F3F5FA', color: '#C2CADA', border: '1px solid #E4E8F1', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, cursor: 'not-allowed' },
+    btnSavePreset: { padding: '0.55rem 1.1rem', backgroundColor: '#E4F7F0', color: '#0E9B6E', border: '1px solid #C3EEDF', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' },
+    btnPresetActive: { padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)', color: 'white', border: 'none', borderRadius: '999px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,122,0,0.3)', fontSize: '0.875rem' },
+    btnPresetInactive: { padding: '0.5rem 1.25rem', backgroundColor: '#F3F5FA', color: '#5B6A88', border: '1px solid #E4E8F1', borderRadius: '999px', fontWeight: 500, cursor: 'pointer', fontSize: '0.875rem' },
+    btnClose: { backgroundColor: '#F3F5FA', border: '1px solid #E4E8F1', color: '#5B6A88', fontSize: '1rem', cursor: 'pointer', borderRadius: '999px', padding: '0.3rem 0.7rem', lineHeight: 1 },
     // Filter strips
-    filterStrip: { padding: '1rem 1.25rem', backgroundColor: '#f3e5f5', borderRadius: '10px', borderLeft: '4px solid #7b1fa2', marginBottom: '1.25rem' },
-    subFilterStrip: { padding: '1rem 1.25rem', backgroundColor: '#fafbff', borderRadius: '10px', border: '1px solid #e8eaf6', marginBottom: '1.25rem' },
-    searchHint: { display: 'block', marginTop: '0.5rem', fontSize: '0.75rem', color: '#607d8b' },
+    filterStrip: { padding: '1rem 1.25rem', backgroundColor: '#FFF6EC', borderRadius: '14px', borderLeft: '4px solid #FF7A00', marginBottom: '1.25rem' },
+    subFilterStrip: { padding: '1rem 1.25rem', backgroundColor: '#FAFBFF', borderRadius: '14px', border: '1px solid #EEF1F8', marginBottom: '1.25rem' },
+    searchHint: { display: 'block', marginTop: '0.5rem', fontSize: '0.75rem', color: '#8A96AD' },
     // Modal
-    overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(30,10,50,0.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
-    modalBox: { backgroundColor: 'white', borderRadius: '14px', maxWidth: '480px', width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' },
-    modalHeader: { background: 'linear-gradient(135deg,#c2185b 0%,#7b1fa2 60%,#4527a0 100%)', padding: '1.1rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    modalTitle: { fontSize: '1.1rem', fontWeight: 700, color: '#fff', margin: 0 },
-    modalBody: { padding: '1.5rem' },
-    modalFooter: { display: 'flex', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #f0f2ff' },
+    overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(20,24,40,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
+    modalBox: { backgroundColor: 'white', borderRadius: '20px', maxWidth: '480px', width: '90%', boxShadow: '0 24px 64px rgba(20,24,40,0.28)', overflow: 'hidden' },
+    modalHeader: { backgroundColor: '#FAFBFF', borderBottom: '1px solid #EEF1F8', padding: '1.25rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    modalTitle: { fontSize: '1.1rem', fontWeight: 700, color: '#1E2A45', margin: 0, fontFamily: "'Poppins', sans-serif" },
+    modalBody: { padding: '1.75rem' },
+    modalFooter: { display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #EEF1F8' },
     // Info/warning boxes
-    infoBlue: { padding: '0.75rem 1rem', borderRadius: '8px', backgroundColor: '#e8eaf6', border: '1px solid #c5cae9', fontSize: '0.8rem', color: '#283593', marginTop: '0.75rem' },
-    warnYellow: { padding: '0.75rem 1rem', borderRadius: '8px', backgroundColor: '#fff8e1', border: '1px solid #ffe082', fontSize: '0.8rem', color: '#5d4037', marginTop: '0.75rem' },
-    errRed: { padding: '0.75rem 1rem', borderRadius: '8px', backgroundColor: '#fce4ec', border: '1px solid #ef9a9a', fontSize: '0.8rem', color: '#b71c1c', marginTop: '0.75rem' },
+    infoBlue: { padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#EDEBFF', border: '1px solid #DCD6FF', fontSize: '0.8rem', color: '#5B4FE0', marginTop: '0.75rem' },
+    warnYellow: { padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#FFF6EC', border: '1px solid #FFE1BF', fontSize: '0.8rem', color: '#A85400', marginTop: '0.75rem' },
+    errRed: { padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#FDF1F2', border: '1px solid #F8CDD3', fontSize: '0.8rem', color: '#E5484D', marginTop: '0.75rem' },
     // Day section
-    dayBadge: { backgroundColor: '#ede7f6', color: '#4527a0', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700 },
+    dayBadge: { backgroundColor: '#FFEEDD', color: '#C15A00', padding: '0.2rem 0.85rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 700 },
     // Table cells
-    cellBreak: { backgroundColor: '#ef9a9a', textAlign: 'center', padding: '0.5rem', fontSize: '0.72rem', fontWeight: 700, color: '#b71c1c', position: 'relative', border: '1px solid #e57373' },
-    cellOccupied: { backgroundColor: '#e8f5e9', padding: '0.25rem', fontSize: '0.72rem', position: 'relative', border: '1px solid #c8e6c9', cursor: 'pointer', textAlign: 'center', verticalAlign: 'middle' },
-    customPreferenceBadge: { display: 'inline-block', backgroundColor: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80', borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.6rem', fontWeight: 700 },
-    cellEmpty: { backgroundColor: 'white', padding: '0.25rem', border: '1px solid #f0f2ff', textAlign: 'center', verticalAlign: 'middle', cursor: 'pointer' },
-    cellBtnEdit: { fontSize: '0.65rem', backgroundColor: '#7b1fa2', color: 'white', border: 'none', borderRadius: '4px', padding: '0.15rem 0.4rem', cursor: 'pointer', marginRight: '0.2rem' },
-    cellBtnDel: { fontSize: '0.65rem', backgroundColor: '#e53935', color: 'white', border: 'none', borderRadius: '4px', padding: '0.15rem 0.4rem', cursor: 'pointer' },
-    cellAddBtn: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', color: '#7b1fa2', fontSize: '1.25rem', fontWeight: 700, cursor: 'pointer' },
+    cellBreak: { backgroundColor: '#FDEBEE', textAlign: 'center', padding: '0.5rem', fontSize: '0.72rem', fontWeight: 700, color: '#E5484D', position: 'relative', border: '1px solid #F8CDD3' },
+    cellOccupied: { backgroundColor: '#E4F7F0', padding: '0.25rem', fontSize: '0.72rem', position: 'relative', border: '1px solid #C3EEDF', cursor: 'pointer', textAlign: 'center', verticalAlign: 'middle' },
+    customPreferenceBadge: { display: 'inline-block', backgroundColor: '#FFF6EC', color: '#A85400', border: '1px solid #FFE1BF', borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.6rem', fontWeight: 700 },
+    cellEmpty: { backgroundColor: 'white', padding: '0.25rem', border: '1px solid #F3F5FA', textAlign: 'center', verticalAlign: 'middle', cursor: 'pointer' },
+    cellBtnEdit: { fontSize: '0.65rem', backgroundColor: '#EDEBFF', color: '#5B4FE0', border: 'none', borderRadius: '999px', padding: '0.15rem 0.5rem', cursor: 'pointer', marginRight: '0.25rem', fontWeight: 600 },
+    cellBtnDel: { fontSize: '0.65rem', backgroundColor: '#FDEBEE', color: '#E5484D', border: 'none', borderRadius: '999px', padding: '0.15rem 0.5rem', cursor: 'pointer', fontWeight: 600 },
+    cellAddBtn: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', color: '#FF7A00', fontSize: '1.25rem', fontWeight: 700, cursor: 'pointer' },
     // Checkbox day toggle
-    dayToggleCard: { backgroundColor: '#fafbff', borderRadius: '10px', border: '1px solid #e8eaf6', padding: '1rem 1.5rem', marginBottom: '1.5rem' },
+    dayToggleCard: { backgroundColor: '#FAFBFF', borderRadius: '14px', border: '1px solid #EEF1F8', padding: '1rem 1.5rem', marginBottom: '1.5rem' },
     // Preset info
-    presetInfoBox: { backgroundColor: '#e8eaf6', borderRadius: '8px', padding: '0.75rem 1rem', marginTop: '0.75rem', fontSize: '0.8rem', color: '#283593' },
+    presetInfoBox: { backgroundColor: '#FFF6EC', borderRadius: '14px', padding: '0.9rem 1.1rem', marginTop: '0.75rem', fontSize: '0.8rem', color: '#A85400', borderLeft: '4px solid #FF7A00' },
     // Popup modal styling
-    popupBox: {
-      background: 'white',
-      borderRadius: '14px',
-      width: '360px',
-      maxWidth: '90vw',
-      boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-      overflow: 'hidden',
-      padding: '2rem',
-      textAlign: 'center',
-    },
-    popupTitle: {
-      fontSize: '2.5rem',
-      margin: '0 0 1rem 0',
-      lineHeight: 1,
-    },
-    popupText: {
-      fontSize: '0.95rem',
-      color: '#37474f',
-      margin: '0 0 1.5rem 0',
-      lineHeight: '1.5',
-      whiteSpace: 'pre-line',
-    },
-    popupBtn: {
-      padding: '0.6rem 1.5rem',
-      background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      fontSize: '0.875rem',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'opacity 0.2s',
-    },
+    popupBox: { background: 'white', borderRadius: '20px', width: '360px', maxWidth: '90vw', boxShadow: '0 24px 64px rgba(20,24,40,0.28)', overflow: 'hidden', padding: '2rem', textAlign: 'center' },
+    popupTitle: { fontSize: '2.5rem', margin: '0 0 1rem 0', lineHeight: 1 },
+    popupText: { fontSize: '0.95rem', color: '#1E2A45', margin: '0 0 1.5rem 0', lineHeight: '1.5', whiteSpace: 'pre-line', fontWeight: 500 },
+    popupBtn: { padding: '0.6rem 1.6rem', background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)', color: 'white', border: 'none', borderRadius: '999px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,122,0,0.3)', transition: 'opacity 0.2s' },
   };
 
   if (checking) return (
     <div style={s.page}>
-      <div style={{ ...s.titleBar, marginBottom: '2rem' }}>
-        <h1 style={s.titleText}>📅 Jadwal Kuliah</h1>
+      <div style={s.titleBar}>
+        <div>
+          <div style={s.breadcrumb}>Dashboard <span style={s.breadcrumbSep}>/</span> Manajemen Akademik <span style={s.breadcrumbSep}>/</span> <span style={s.breadcrumbActive}>Jadwal</span></div>
+          <h1 style={s.titleText}>Jadwal Kuliah</h1>
+          <p style={s.titleSub}>Kelola jadwal kuliah dengan mudah</p>
+        </div>
+        <div style={s.headerIconWrap}><span style={s.headerIcon}>📅</span></div>
       </div>
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#7b1fa2', fontWeight: 600 }}>⏳ Checking authentication...</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: '#FF7A00', fontWeight: 600 }}>⏳ Checking authentication...</div>
     </div>
   );
 
   if (loading) return (
     <div style={s.page}>
-      <div style={{ ...s.titleBar, marginBottom: '2rem' }}>
-        <h1 style={s.titleText}>📅 Jadwal Kuliah</h1>
+      <div style={s.titleBar}>
+        <div>
+          <div style={s.breadcrumb}>Dashboard <span style={s.breadcrumbSep}>/</span> Manajemen Akademik <span style={s.breadcrumbSep}>/</span> <span style={s.breadcrumbActive}>Jadwal</span></div>
+          <h1 style={s.titleText}>Jadwal Kuliah</h1>
+          <p style={s.titleSub}>Kelola jadwal kuliah dengan mudah</p>
+        </div>
+        <div style={s.headerIconWrap}><span style={s.headerIcon}>📅</span></div>
       </div>
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#7b1fa2', fontWeight: 600 }}>⏳ Memuat data...</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: '#FF7A00', fontWeight: 600 }}>⏳ Memuat data...</div>
     </div>
   );
 
@@ -864,9 +888,11 @@ export default function JadwalPage() {
       {/* ── Title Bar ── */}
       <div style={s.titleBar}>
         <div>
-          <h1 style={s.titleText}>📅 Jadwal Kuliah</h1>
+          <div style={s.breadcrumb}>Dashboard <span style={s.breadcrumbSep}>/</span> Manajemen Akademik <span style={s.breadcrumbSep}>/</span> <span style={s.breadcrumbActive}>Jadwal</span></div>
+          <h1 style={s.titleText}>Jadwal Kuliah</h1>
           <p style={s.titleSub}>Kelola jadwal kuliah dengan mudah</p>
         </div>
+        <div style={s.headerIconWrap}><span style={s.headerIcon}>📅</span></div>
       </div>
 
       <div style={s.inner}>
@@ -922,7 +948,7 @@ export default function JadwalPage() {
                       setSelectedDosenForPref(dosenList[0]);
                       handleEditDosenPreference(dosenList[0]);
                     }}
-                    style={{ ...s.btnSavePreset, backgroundColor: 'rgba(100, 200, 150, 0.3)' }}
+                    style={s.btnSavePreset}
                     title="Pilih dosen untuk edit preferensi"
                   >
                     👥 Kelola Preferensi Dosen
@@ -984,7 +1010,7 @@ export default function JadwalPage() {
                 <label style={s.label}>Istirahat Senin-Kamis</label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input type="time" value={settings.jamIstirahatMulaiSeninKamis} onChange={(e) => setSettings({ ...settings, jamIstirahatMulaiSeninKamis: e.target.value })} style={{ ...s.input, flex: 1 }} />
-                  <span style={{ color: '#90a4ae' }}>–</span>
+                  <span style={{ color: '#8A96AD' }}>–</span>
                   <input type="time" value={settings.jamIstirahatSelesaiSeninKamis} onChange={(e) => setSettings({ ...settings, jamIstirahatSelesaiSeninKamis: e.target.value })} style={{ ...s.input, flex: 1 }} />
                 </div>
               </div>
@@ -1000,7 +1026,7 @@ export default function JadwalPage() {
                 <label style={s.label}>Istirahat Jumat</label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input type="time" value={settings.jamIstirahatMulaiJumat} onChange={(e) => setSettings({ ...settings, jamIstirahatMulaiJumat: e.target.value })} style={{ ...s.input, flex: 1 }} />
-                  <span style={{ color: '#90a4ae' }}>–</span>
+                  <span style={{ color: '#8A96AD' }}>–</span>
                   <input type="time" value={settings.jamIstirahatSelesaiJumat} onChange={(e) => setSettings({ ...settings, jamIstirahatSelesaiJumat: e.target.value })} style={{ ...s.input, flex: 1 }} />
                 </div>
               </div>
@@ -1021,8 +1047,8 @@ export default function JadwalPage() {
           <p style={{ ...s.label, marginBottom: '0.75rem' }}>Tampilkan / Sembunyikan Hari</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
             {days.map((day) => (
-              <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f', fontWeight: 500 }}>
-                <input type="checkbox" checked={visibleDays[day]} onChange={(e) => setVisibleDays({ ...visibleDays, [day]: e.target.checked })} style={{ accentColor: '#7b1fa2', width: '16px', height: '16px' }} />
+              <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#42506B', fontWeight: 500 }}>
+                <input type="checkbox" checked={visibleDays[day]} onChange={(e) => setVisibleDays({ ...visibleDays, [day]: e.target.checked })} style={{ accentColor: '#FF7A00', width: '16px', height: '16px' }} />
                 {day}
               </label>
             ))}
@@ -1031,27 +1057,27 @@ export default function JadwalPage() {
 
         {/* ── Schedule Matrix ── */}
         <div style={s.card}>
-                      <div style={s.subFilterStrip}>
-              <label style={s.label}>🔎 Search Sesi (Dosen / NIDN / Mata Kuliah)</label>
-              <input
-                type="text"
-                value={scheduleSearch}
-                onChange={(e) => setScheduleSearch(e.target.value)}
-                placeholder="Contoh: Budi, 0011223344, Algoritma"
-                style={s.input}
-              />
-              <small style={s.searchHint}>Saat diisi, matriks hanya menampilkan sesi yang cocok dengan keyword.</small>
-            </div>
+          <div style={s.subFilterStrip}>
+            <label style={s.label}>🔎 Search Sesi (Dosen / NIDN / Mata Kuliah)</label>
+            <input
+              type="text"
+              value={scheduleSearch}
+              onChange={(e) => setScheduleSearch(e.target.value)}
+              placeholder="Contoh: Budi, 0011223344, Algoritma"
+              style={s.input}
+            />
+            <small style={s.searchHint}>Saat diisi, matriks hanya menampilkan sesi yang cocok dengan keyword.</small>
+          </div>
 
-            <div style={s.subFilterStrip}>
-              <label style={s.label}>🏷️ Filter Prodi ID</label>
-              <select value={selectedProdiFilter} onChange={(e) => setSelectedProdiFilter(e.target.value)} style={s.select}>
-                <option value="ALL">Default - Semua Prodi</option>
-                {Array.from(new Set(dosenList.map((d) => (d.f_progdi_id || '').trim()).filter(Boolean))).sort().map((prodiId) => (
-                  <option key={prodiId} value={prodiId}>{prodiId}</option>
-                ))}
-              </select>
-            </div>
+          <div style={s.subFilterStrip}>
+            <label style={s.label}>🏷️ Filter Prodi ID</label>
+            <select value={selectedProdiFilter} onChange={(e) => setSelectedProdiFilter(e.target.value)} style={s.select}>
+              <option value="ALL">Default - Semua Prodi</option>
+              {Array.from(new Set(dosenList.map((d) => (d.f_progdi_id || '').trim()).filter(Boolean))).sort().map((prodiId) => (
+                <option key={prodiId} value={prodiId}>{prodiId}</option>
+              ))}
+            </select>
+          </div>
 
           <div style={s.cardHeader}>
             <h3 style={s.cardHeaderText}>📋 Matriks Jadwal Kuliah</h3>
@@ -1075,25 +1101,25 @@ export default function JadwalPage() {
               return (
                 <div key={day} style={{ marginBottom: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#4a148c', margin: 0 }}>{day}</h3>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1E2A45', margin: 0, fontFamily: "'Poppins', sans-serif" }}>{day}</h3>
                     <span style={s.dayBadge}>{totalSesi} sesi</span>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid #EEF1F8' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                       <thead>
-                        <tr style={{ background: 'linear-gradient(135deg,#7b1fa2 0%,#4527a0 100%)' }}>
-                          <th style={{ padding: '0.65rem 0.75rem', textAlign: 'left', color: 'white', fontWeight: 700, fontSize: '0.78rem', width: '120px', border: '1px solid rgba(255,255,255,0.15)' }}>Ruangan</th>
+                        <tr style={{ backgroundColor: '#FAFBFF' }}>
+                          <th style={{ padding: '0.65rem 0.75rem', textAlign: 'left', color: '#5B6A88', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '120px', border: '1px solid #EEF1F8' }}>Ruangan</th>
                           {timeSlots.map((slot, idx) => (
-                            <th key={idx} style={{ padding: '0.5rem 0.25rem', textAlign: 'center', color: slot.isBreak ? '#b71c1c' : 'white', fontWeight: slot.isBreak ? 700 : 600, fontSize: '0.68rem', width: '80px', backgroundColor: slot.isBreak ? '#ffcdd2' : 'transparent', border: '1px solid rgba(255,255,255,0.15)' }}>
-                              <div>{slot.start}</div><div style={{ fontSize: '0.6rem', opacity: 0.7 }}>–</div><div>{slot.end}</div>
+                            <th key={idx} style={{ padding: '0.5rem 0.25rem', textAlign: 'center', color: slot.isBreak ? '#E5484D' : '#5B6A88', fontWeight: slot.isBreak ? 700 : 600, fontSize: '0.68rem', width: '80px', backgroundColor: slot.isBreak ? '#FDEBEE' : 'transparent', border: '1px solid #EEF1F8' }}>
+                              <div>{slot.start}</div><div style={{ fontSize: '0.6rem', opacity: 0.6 }}>–</div><div>{slot.end}</div>
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {[...ruanganList].sort((a, b) => (a.f_namaruang || '').localeCompare(b.f_namaruang || '')).map((ruangan) => (
-                          <tr key={ruangan.id} style={{ borderBottom: '1px solid #f0f2ff' }}>
-                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, fontSize: '0.8rem', color: '#37474f', backgroundColor: '#fafbff', border: '1px solid #f0f2ff', verticalAlign: 'middle' }}>
+                          <tr key={ruangan.id} style={{ borderBottom: '1px solid #F3F5FA' }}>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, fontSize: '0.8rem', color: '#C15A00', backgroundColor: '#FFF6EC', border: '1px solid #EEF1F8', verticalAlign: 'middle' }}>
                               {ruangan.f_namaruang}
                             </td>
                             {timeSlots.map((slot, idx) => {
@@ -1116,7 +1142,7 @@ export default function JadwalPage() {
                               if (sessionInSlot) return (
                                 <td key={idx} style={s.cellOccupied}>
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', height: '100%', justifyContent: 'center' }}>
-                                    <span style={{ fontWeight: 700, color: '#2e7d32', fontSize: '0.7rem', textAlign: 'center', lineHeight: 1.3 }}>{sessionInSlot.display_name}</span>
+                                    <span style={{ fontWeight: 700, color: '#0E9B6E', fontSize: '0.7rem', textAlign: 'center', lineHeight: 1.3 }}>{sessionInSlot.display_name}</span>
                                     {getSessionContext(sessionInSlot).isCustomPreference && (
                                       <span style={s.customPreferenceBadge}>Custom Pref</span>
                                     )}
@@ -1128,8 +1154,8 @@ export default function JadwalPage() {
                                 </td>
                               );
                               if (isOccupied && occupyingSession) return (
-                                <td key={idx} style={{ ...s.cellOccupied, backgroundColor: '#f3e5f5', border: '1px solid #e1bee7' }} onClick={() => openEditModal(occupyingSession)}>
-                                  <span style={{ fontSize: '0.65rem', color: '#7b1fa2', fontStyle: 'italic', opacity: 0.75 }}>({occupyingSession.display_name})</span>
+                                <td key={idx} style={{ ...s.cellOccupied, backgroundColor: '#FFF6EC', border: '1px solid #FFE1BF' }} onClick={() => openEditModal(occupyingSession)}>
+                                  <span style={{ fontSize: '0.65rem', color: '#C15A00', fontStyle: 'italic', opacity: 0.85 }}>({occupyingSession.display_name})</span>
                                 </td>
                               );
                               if (hasActiveDisplayFilter) return (
@@ -1178,8 +1204,8 @@ export default function JadwalPage() {
                   <label style={s.label}>Mode Input</label>
                   <div style={{ display: 'flex', gap: '1.5rem' }}>
                     {['manual', 'import'].map((mode) => (
-                      <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f', fontWeight: sessionInputMode === mode ? 700 : 400 }}>
-                        <input type="radio" value={mode} checked={sessionInputMode === mode} onChange={(e) => setSessionInputMode(e.target.value)} style={{ accentColor: '#7b1fa2' }} />
+                      <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.875rem', color: '#42506B', fontWeight: sessionInputMode === mode ? 700 : 400 }}>
+                        <input type="radio" value={mode} checked={sessionInputMode === mode} onChange={(e) => setSessionInputMode(e.target.value)} style={{ accentColor: '#FF7A00' }} />
                         {mode === 'manual' ? 'Manual' : 'Import dari Kelas'}
                       </label>
                     ))}
@@ -1192,7 +1218,7 @@ export default function JadwalPage() {
                 <div>
                   <label style={s.label}>Jam Selesai (Otomatis)</label>
                   <input type="time" value={calculatedJamSelesai} disabled style={s.inputDisabled} />
-                  {selectedKelas && <small style={{ fontSize: '0.75rem', color: '#7b1fa2', marginTop: '0.25rem', display: 'block' }}>📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit</small>}
+                  {selectedKelas && <small style={{ fontSize: '0.75rem', color: '#FF7A00', marginTop: '0.25rem', display: 'block', fontWeight: 600 }}>📊 {selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1} SKS × {settings.durasiSlot} menit</small>}
                   {selectedKelas && (() => { const sks = selectedKelas.sks || selectedKelas.f_sks_kurikulum || 1; if (sks >= 2 && isSessionCutByBreak(selectedHari, selectedJamMulai, calculatedJamSelesai, sks)) { const bt = getBreakTimes(selectedHari); return <div style={s.errRed}><strong>❌ Jadwal Tidak Valid</strong><br />Kelas {sks} SKS tidak boleh terpotong istirahat <strong>{bt.mulai}–{bt.selesai}</strong></div>; } return null; })()}
                 </div>
                 <div>
@@ -1207,7 +1233,7 @@ export default function JadwalPage() {
                           {kelasList.map((k) => <option key={k.id} value={k.id}>{k.display_name || k.nama_kelas} (SKS: {k.sks || k.f_sks_kurikulum})</option>)}
                         </select>
                       ) : (
-                        <div style={{ padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1.5px solid #e8eaf6', fontSize: '0.875rem', color: '#c4403d', backgroundColor: '#fce4ec' }}>
+                        <div style={{ padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1.5px solid #F8CDD3', fontSize: '0.875rem', color: '#E5484D', backgroundColor: '#FDF1F2' }}>
                           <strong>❌ Tidak ada kelas</strong><br />
                           <small>Pastikan sudah memilih tahun akademik dan semester</small>
                         </div>
@@ -1246,20 +1272,20 @@ export default function JadwalPage() {
             </div>
             <div style={s.modalBody}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f' }}>
-                  <input type="checkbox" checked={autoGenSettings.fillEmptyOnly} onChange={(e) => setAutoGenSettings({ ...autoGenSettings, fillEmptyOnly: e.target.checked })} style={{ accentColor: '#7b1fa2' }} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#42506B' }}>
+                  <input type="checkbox" checked={autoGenSettings.fillEmptyOnly} onChange={(e) => setAutoGenSettings({ ...autoGenSettings, fillEmptyOnly: e.target.checked })} style={{ accentColor: '#FF7A00' }} />
                   Isi hanya kelas yang belum dijadwalkan
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mode Generate</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#5B6A88', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mode Generate</span>
                   {['normal', 'preferensi'].map((mode) => (
-                    <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#37474f' }}>
+                    <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#42506B' }}>
                       <input
                         type="radio"
                         name="autoGenMode"
                         checked={autoGenSettings.mode === mode}
                         onChange={() => setAutoGenSettings({ ...autoGenSettings, mode })}
-                        style={{ accentColor: '#7b1fa2' }}
+                        style={{ accentColor: '#FF7A00' }}
                       />
                       {mode === 'normal' ? 'Generate normal' : 'Generate dengan preferensi dosen'}
                     </label>
@@ -1296,16 +1322,16 @@ export default function JadwalPage() {
                   </div>
 
                   {/* Floor Preferences Section */}
-                  <div style={{...s.presetInfoBox, marginTop: '1rem'}}>
+                  <div style={{ ...s.presetInfoBox, marginTop: '1rem' }}>
                     <strong>🏢 Preferensi Lantai:</strong>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
                       {[1, 2, 3, 4].map((floor) => (
-                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#37474f', fontWeight: '500' }}>
+                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#42506B', fontWeight: '500' }}>
                           <input
                             type="checkbox"
                             checked={floorPreferences[floor] || false}
                             onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#7b1fa2' }}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#FF7A00' }}
                           />
                           Lantai {floor}
                         </label>
@@ -1313,11 +1339,11 @@ export default function JadwalPage() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '1.5rem', overflowX: 'auto' }}>
+                  <div style={{ marginTop: '1.5rem', overflowX: 'auto', borderRadius: '14px', border: '1px solid #EEF1F8' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', marginBottom: '1rem' }}>
                       <thead>
-                        <tr style={{ background: 'linear-gradient(135deg,#7b1fa2 0%,#4527a0 100%)' }}>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', color: 'white', fontWeight: 700, fontSize: '0.78rem', minWidth: '80px', border: '1px solid #e8eaf6' }}>
+                        <tr style={{ backgroundColor: '#FAFBFF' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', color: '#5B6A88', fontWeight: 700, fontSize: '0.75rem', minWidth: '80px', border: '1px solid #EEF1F8' }}>
                             <input
                               type="checkbox"
                               checked={(() => {
@@ -1352,12 +1378,12 @@ export default function JadwalPage() {
                                   return updated;
                                 });
                               }}
-                              style={{ accentColor: '#7b1fa2', cursor: 'pointer' }}
+                              style={{ accentColor: '#FF7A00', cursor: 'pointer' }}
                               title="Pilih Semua"
                             />
                           </th>
                           {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
-                            <th key={day} style={{ padding: '0.75rem', textAlign: 'center', color: 'white', fontWeight: 700, fontSize: '0.78rem', minWidth: '100px', border: '1px solid #e8eaf6' }}>
+                            <th key={day} style={{ padding: '0.75rem', textAlign: 'center', color: '#5B6A88', fontWeight: 700, fontSize: '0.75rem', minWidth: '100px', border: '1px solid #EEF1F8' }}>
                               {day}
                             </th>
                           ))}
@@ -1365,12 +1391,12 @@ export default function JadwalPage() {
                       </thead>
                       <tbody>
                         {Object.keys(preferences['Senin'] || {}).map((session) => (
-                          <tr key={session} style={{ borderBottom: '1px solid #f0f2ff' }}>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem', backgroundColor: '#fafbff', border: '1px solid #f0f2ff', minWidth: '80px' }}>
+                          <tr key={session} style={{ borderBottom: '1px solid #F3F5FA' }}>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem', color: '#C15A00', backgroundColor: '#FFF6EC', border: '1px solid #EEF1F8', minWidth: '80px' }}>
                               {session}
                             </td>
                             {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
-                              <td key={`${day}-${session}`} style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #f0f2ff', backgroundColor: preferences[day]?.[session] ? '#e8f5e9' : 'white' }}>
+                              <td key={`${day}-${session}`} style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F3F5FA', backgroundColor: preferences[day]?.[session] ? '#E4F7F0' : 'white' }}>
                                 <input
                                   type="checkbox"
                                   checked={preferences[day]?.[session] || false}
@@ -1383,7 +1409,7 @@ export default function JadwalPage() {
                                       }
                                     });
                                   }}
-                                  style={{ accentColor: '#7b1fa2', cursor: 'pointer', width: '18px', height: '18px' }}
+                                  style={{ accentColor: '#FF7A00', cursor: 'pointer', width: '18px', height: '18px' }}
                                   title={`${day} jam ${session}`}
                                 />
                               </td>
