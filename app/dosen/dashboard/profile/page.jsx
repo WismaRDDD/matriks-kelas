@@ -1,27 +1,18 @@
-﻿'use client';
+'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
-export default function DosenJadwalPage() {
+export default function DosenProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [dosen, setDosen] = useState(null);
-  const [allJadwal, setAllJadwal] = useState([]);
-  const [kelasMap, setKelasMap] = useState({});
-  const [tahunAkademikList, setTahunAkademikList] = useState([]);
-  const [selectedTahunAkademik, setSelectedTahunAkademik] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState('Gasal');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDosenData = async () => {
       try {
-        setLoading(true);
-        setError('');
-
+        // Check session first to get NIDN
         const sessionRes = await fetch('/api/auth/session');
         if (!sessionRes.ok) {
           router.push('/login');
@@ -29,129 +20,29 @@ export default function DosenJadwalPage() {
         }
 
         const sessionData = await sessionRes.json();
-        if (sessionData?.session?.role !== 'dosen') {
-          router.push('/login');
+        const nidn = sessionData.session.nidn;
+
+        // Fetch dosen data
+        const res = await fetch(`/api/dosen/get-by-nidn?nidn=${nidn}`);
+        if (!res.ok) {
+          setError('Gagal mengambil data profil');
           return;
         }
 
-        const nidn = sessionData?.session?.nidn;
-        if (!nidn) {
-          setError('Session dosen tidak valid. Silakan login ulang.');
-          return;
-        }
-
-        const dosenRes = await fetch(`/api/dosen/get-by-nidn?nidn=${encodeURIComponent(nidn)}`);
-        if (!dosenRes.ok) {
-          setError('Gagal mengambil data dosen.');
-          return;
-        }
-
-        const dosenData = await dosenRes.json();
-        setDosen(dosenData);
-
-        const [jadwalRes, kelasRes, tahunRes] = await Promise.all([
-          fetch(`/api/jadwal?dosen_id=${dosenData.id}`),
-          fetch('/api/kelas'),
-          fetch('/api/tahun-akademik'),
-        ]);
-
-        if (!jadwalRes.ok || !kelasRes.ok || !tahunRes.ok) {
-          setError('Gagal mengambil data jadwal.');
-          return;
-        }
-
-        const jadwalData = await jadwalRes.json();
-        const kelasData = await kelasRes.json();
-        const tahunData = await tahunRes.json();
-
-        const nextKelasMap = {};
-        (Array.isArray(kelasData) ? kelasData : []).forEach((kelas) => {
-          nextKelasMap[kelas.id] = kelas;
-        });
-
-        const safeTahun = Array.isArray(tahunData) ? tahunData : [];
-
-        setAllJadwal(Array.isArray(jadwalData) ? jadwalData : []);
-        setKelasMap(nextKelasMap);
-        setTahunAkademikList(safeTahun);
-        if (safeTahun.length > 0) {
-          setSelectedTahunAkademik(String(safeTahun[0].id));
-        }
+        const data = await res.json();
+        setDosen(data);
       } catch (err) {
-        setError(`Terjadi kesalahan: ${err.message}`);
+        console.error('Error:', err);
+        setError('Terjadi kesalahan: ' + err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchDosenData();
   }, [router]);
 
-  const filteredJadwal = useMemo(() => {
-    const selectedTahun = String(selectedTahunAkademik || '');
-
-    return allJadwal.filter((item) => {
-      const kelasMeta = kelasMap[item.kelas_id];
-      const itemTahun = String(kelasMeta?.f_tahun_akademik || '');
-
-      if (selectedTahun && itemTahun && itemTahun !== selectedTahun) {
-        return false;
-      }
-
-      const semesterNumber = Number(item.semester || kelasMeta?.f_semester || 0);
-      if (!semesterNumber) {
-        return false;
-      }
-
-      const isGasal = semesterNumber % 2 === 1;
-      return selectedSemester === 'Gasal' ? isGasal : !isGasal;
-    });
-  }, [allJadwal, kelasMap, selectedSemester, selectedTahunAkademik]);
-
-  const groupedByDay = useMemo(() => {
-    const grouped = {
-      Senin: [],
-      Selasa: [],
-      Rabu: [],
-      Kamis: [],
-      Jumat: [],
-      Sabtu: [],
-    };
-
-    filteredJadwal.forEach((item) => {
-      if (grouped[item.hari]) {
-        grouped[item.hari].push(item);
-      }
-    });
-
-    DAYS.forEach((day) => {
-      grouped[day].sort((a, b) => String(a.jam_mulai || '').localeCompare(String(b.jam_mulai || '')));
-    });
-
-    return grouped;
-  }, [filteredJadwal]);
-
-  const totalSesi = filteredJadwal.length;
-  const totalHariAktif = DAYS.filter((day) => (groupedByDay[day] || []).length > 0).length;
-  const totalMataKuliah = useMemo(() => {
-    const set = new Set();
-    filteredJadwal.forEach((item) => {
-      const kelasMeta = kelasMap[item.kelas_id] || {};
-      const mataKuliah = item.nama_matakuliah || item.nama_mk || item.display_name || kelasMeta.f_namamk || kelasMeta.nama_kelas;
-      if (mataKuliah) set.add(mataKuliah);
-    });
-    return set.size;
-  }, [filteredJadwal, kelasMap]);
-  const totalRuangan = useMemo(() => {
-    const set = new Set();
-    filteredJadwal.forEach((item) => {
-      const namaRuangan = item.nama_ruangan_db || item.nama_ruangan;
-      if (namaRuangan) set.add(namaRuangan);
-    });
-    return set.size;
-  }, [filteredJadwal]);
-
-  // Add hover styles + font import on client side only (matches Edumy theme)
+  // Add hover styles + font import on client side only (same as DosenPage)
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -161,20 +52,6 @@ export default function DosenJadwalPage() {
 
       * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-      select:hover {
-        border-color: #FF7A00 !important;
-      }
-
-      select:focus {
-        outline: none;
-        border-color: #FF7A00 !important;
-        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
-      }
-
-      tr.edumy-row:hover {
-        background-color: #FFF6EC !important;
-      }
-
       ::-webkit-scrollbar { height: 8px; width: 8px; }
       ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
@@ -182,12 +59,36 @@ export default function DosenJadwalPage() {
     document.head.appendChild(styleSheet);
   }, []);
 
+  function formatNamaLengkap(d) {
+    if (!d) return '';
+    let nama = '';
+    if (d.f_title_depan) nama += d.f_title_depan + ' ';
+    nama += d.f_namapegawai;
+    if (d.f_title_belakang) nama += ', ' + d.f_title_belakang;
+    return nama;
+  }
+
+  function formatTanggalLahir(value) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+
+  function jkLabel(jk) {
+    if (jk === 'L' || jk === 'Laki-laki') return 'Laki-laki';
+    if (jk === 'P' || jk === 'Perempuan') return 'Perempuan';
+    return jk || '-';
+  }
+
   if (loading) {
     return (
       <div style={styles.container}>
         <div style={styles.pageWrap}>
           <div style={styles.card}>
-            <div style={styles.loading}>⏳ Memuat jadwal...</div>
+            <div style={styles.loading}>⏳ Memuat profil...</div>
           </div>
         </div>
       </div>
@@ -198,13 +99,18 @@ export default function DosenJadwalPage() {
     return (
       <div style={styles.container}>
         <div style={styles.pageWrap}>
-          <div style={styles.card}>
-            <div style={styles.errorBox}>❌ {error}</div>
+          <div style={{ ...styles.card, ...styles.errorCard }}>
+            <span style={styles.errorIcon}>❌</span>
+            <p style={styles.errorText}>{error}</p>
           </div>
         </div>
       </div>
     );
   }
+
+  const jk = dosen?.f_jeniskelamin;
+  const jkIsMale = jk === 'L' || jk === 'Laki-laki';
+  const jkIsFemale = jk === 'P' || jk === 'Perempuan';
 
   return (
     <div style={styles.container}>
@@ -213,184 +119,141 @@ export default function DosenJadwalPage() {
         {/* Edumy-style breadcrumb / page header */}
         <div style={styles.pageHeader}>
           <div>
-            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Jadwal Saya <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Jadwal Dosen</span></div>
-            <h1 style={styles.title}>Jadwal Dosen</h1>
-            <p style={styles.subtitle}>Jadwal mengajar Anda yang telah disusun oleh admin (read-only).</p>
+            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Akun Saya <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Profil</span></div>
+            <h1 style={styles.title}>Profil Dosen</h1>
+            <p style={styles.subtitle}>Informasi biodata dan kepegawaian Anda.</p>
           </div>
           <div style={styles.headerIconWrap}>
-            <span style={styles.headerIcon}>🗓️</span>
+            <span style={styles.headerIcon}>👤</span>
           </div>
         </div>
 
-        {/* Stat widgets */}
+        {/* Identity summary widgets */}
         <div style={styles.statsRow}>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>📅</div>
+            <div style={{ ...styles.statIcon, background: '#EDEBFF', color: '#5B4FE0' }}>🪪</div>
             <div>
-              <div style={styles.statNumber}>{totalSesi}</div>
-              <div style={styles.statLabel}>Total Sesi</div>
+              <div style={styles.statNumber}>{dosen?.f_nidn || '-'}</div>
+              <div style={styles.statLabel}>NIDN</div>
             </div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statIcon, background: '#E7EEFF', color: '#3E5EF0' }}>📖</div>
+            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>🧾</div>
             <div>
-              <div style={styles.statNumber}>{totalMataKuliah}</div>
-              <div style={styles.statLabel}>Mata Kuliah</div>
+              <div style={styles.statNumber}>{dosen?.f_nip || '-'}</div>
+              <div style={styles.statLabel}>NIP</div>
             </div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#12B886' }}>🏫</div>
+            <div style={{ ...styles.statIcon, background: jkIsMale ? '#E7EEFF' : jkIsFemale ? '#FDE8F1' : '#F3F5FA', color: jkIsMale ? '#3E5EF0' : jkIsFemale ? '#E0448A' : '#8A96AD' }}>
+              {jkIsMale ? '♂' : jkIsFemale ? '♀' : '—'}
+            </div>
             <div>
-              <div style={styles.statNumber}>{totalRuangan}</div>
-              <div style={styles.statLabel}>Ruangan Digunakan</div>
+              <div style={styles.statNumber}>{jkLabel(jk)}</div>
+              <div style={styles.statLabel}>Jenis Kelamin</div>
             </div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statIcon, background: '#FDE8F1', color: '#E0448A' }}>📌</div>
+            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#0E9B6E' }}>📚</div>
             <div>
-              <div style={styles.statNumber}>{totalHariAktif}</div>
-              <div style={styles.statLabel}>Hari Aktif Mengajar</div>
+              <div style={styles.statNumber}>{dosen?.f_progdi_id || '-'}</div>
+              <div style={styles.statLabel}>Program Studi</div>
             </div>
           </div>
         </div>
 
         <div style={styles.card}>
           {dosen && (
-            <div style={styles.infoBox}>
-              <div style={styles.infoBoxLeft}>
-                <span style={styles.infoAvatar}>🧑‍🏫</span>
+            <>
+              {/* Name banner */}
+              <div style={styles.nameBanner}>
+                <div style={styles.avatarCircle}>
+                  {dosen.f_namapegawai ? dosen.f_namapegawai.trim().charAt(0).toUpperCase() : '?'}
+                </div>
                 <div>
-                  <strong style={styles.infoName}>{dosen.f_namapegawai}</strong>
-                  <div style={styles.infoMeta}>NIDN: <span style={styles.badgeCode}>{dosen.f_nidn}</span></div>
+                  <div style={styles.nameBannerName}>{formatNamaLengkap(dosen)}</div>
+                  <span style={styles.badgeCode}>{dosen.f_nidn || '-'}</span>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Filter toolbar */}
-          <div style={styles.filterRow}>
-            <div style={styles.filterItem}>
-              <label style={styles.label}>Tahun Akademik</label>
-              <select
-                value={selectedTahunAkademik}
-                onChange={(e) => setSelectedTahunAkademik(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Semua Tahun</option>
-                {tahunAkademikList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.tahun_akademik}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.filterItem}>
-              <label style={styles.label}>Semester</label>
-              <select
-                value={selectedSemester}
-                onChange={(e) => setSelectedSemester(e.target.value)}
-                style={styles.select}
-              >
-                <option value="Gasal">Gasal</option>
-                <option value="Genap">Genap</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Schedule Section */}
-          <div style={styles.tableWrapper}>
-            <div style={styles.tableHeader}>
-              <h2 style={styles.tableTitle}>📋 Jadwal Mengajar</h2>
-              <span style={styles.badgeCount}>Total: {totalSesi} sesi</span>
-            </div>
-
-            {totalSesi === 0 ? (
-              <div style={styles.emptyState}>
-                <span style={styles.emptyIcon}>📭</span>
-                <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada jadwal untuk filter yang dipilih</p>
-                <small style={{ color: '#8A96AD' }}>Coba ubah tahun akademik atau semester</small>
-              </div>
-            ) : (
-              DAYS.map((day) => {
-                const sessions = groupedByDay[day] || [];
-                if (sessions.length === 0) {
-                  return null;
-                }
-
-                return (
-                  <div key={day} style={styles.daySection}>
-                    <div style={styles.dayHeader}>
-                      <h3 style={styles.dayTitle}>{day}</h3>
-                      <span style={styles.dayCount}>{sessions.length} sesi</span>
+              <div style={styles.sectionsGrid}>
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>🪪 Informasi Kepegawaian</h3>
+                  <div style={styles.fieldGroup}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>NIDN</label>
+                      <span style={styles.badgeCode}>{dosen.f_nidn || '-'}</span>
                     </div>
-
-                    <div style={styles.tableContainer}>
-                      <table style={styles.table}>
-                        <thead>
-                          <tr style={styles.tableHeaderRow}>
-                            <th style={styles.th}>Jam</th>
-                            <th style={styles.th}>Mata Kuliah</th>
-                            <th style={styles.th}>Ruangan</th>
-                            <th style={styles.th}>Kelas</th>
-                            <th style={styles.th}>Semester</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessions.map((item) => {
-                            const kelasMeta = kelasMap[item.kelas_id] || {};
-                            const mataKuliah =
-                              item.nama_matakuliah ||
-                              item.nama_mk ||
-                              item.display_name ||
-                              kelasMeta.f_namamk ||
-                              kelasMeta.nama_kelas ||
-                              '-';
-
-                            const namaRuangan = item.nama_ruangan_db || item.nama_ruangan || '-';
-                            const namaKelas = kelasMeta.nama_kelas || item.display_name || '-';
-
-                            return (
-                              <tr key={item.id} className="edumy-row" style={styles.tableRow}>
-                                <td style={styles.td}>
-                                  <span style={styles.badgeDate}>{item.jam_mulai} - {item.jam_selesai}</span>
-                                </td>
-                                <td style={styles.td}>
-                                  <strong style={{ color: '#2B3654' }}>{mataKuliah}</strong>
-                                </td>
-                                <td style={styles.td}>
-                                  <span style={styles.badgeProdi}>{namaRuangan}</span>
-                                </td>
-                                <td style={styles.td}>{namaKelas}</td>
-                                <td style={styles.td}>
-                                  <span style={styles.badgeCode}>{item.semester || kelasMeta.f_semester || '-'}</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    <div style={styles.field}>
+                      <label style={styles.label}>NIP</label>
+                      <span style={styles.value}>{dosen.f_nip || '-'}</span>
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
+                </div>
+
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>🎓 Nama dan Gelar</h3>
+                  <div style={styles.fieldGroup}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Gelar Depan</label>
+                      <span style={styles.value}>{dosen.f_title_depan || '-'}</span>
+                    </div>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Nama Lengkap</label>
+                      <span style={styles.value}>{dosen.f_namapegawai}</span>
+                    </div>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Gelar Belakang</label>
+                      <span style={styles.value}>{dosen.f_title_belakang || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>📍 Data Demografis</h3>
+                  <div style={styles.fieldGroup}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Tempat Lahir</label>
+                      <span style={styles.value}>{dosen.f_tempatlahir || '-'}</span>
+                    </div>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Tanggal Lahir</label>
+                      <span style={styles.badgeDate}>{formatTanggalLahir(dosen.f_tanggallahir)}</span>
+                    </div>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Jenis Kelamin</label>
+                      <span style={jkIsMale ? styles.badgeMale : jkIsFemale ? styles.badgeFemale : styles.value}>
+                        {jkIsMale ? '♂ Laki-laki' : jkIsFemale ? '♀ Perempuan' : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>🏫 Organisasi</h3>
+                  <div style={styles.fieldGroup}>
+                    <div style={styles.field}>
+                      <label style={styles.label}>Program Studi</label>
+                      <span style={styles.badgeProdi}>{dosen.f_progdi_id || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-
-// ── Edumy-inspired design tokens (matches DosenPage) ──────────
+// ── Edumy-inspired design tokens (matches DosenPage) ────────────
 // Primary: #FF7A00 (Edumy signature orange)
 // Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
 // Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
 
 const styles = {
 
-  // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
     background: '#F3F5FA',
@@ -399,7 +262,7 @@ const styles = {
   },
 
   pageWrap: {
-    maxWidth: '1400px',
+    maxWidth: '1100px',
     margin: '0 auto',
   },
 
@@ -481,11 +344,11 @@ const styles = {
     flexShrink: 0,
   },
   statNumber: {
-    fontSize: '1.45rem',
+    fontSize: '1.1rem',
     fontWeight: '700',
     color: '#1E2A45',
     fontFamily: "'Poppins', sans-serif",
-    lineHeight: 1.1,
+    lineHeight: 1.2,
   },
   statLabel: {
     fontSize: '0.8rem',
@@ -503,154 +366,22 @@ const styles = {
     padding: '1.75rem',
   },
 
-  // ── Info box (dosen identity) ───────────────────────────────
-  infoBox: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '1rem',
-    backgroundColor: '#FFF6EC',
-    padding: '1rem 1.25rem',
-    borderRadius: '14px',
-    marginBottom: '1.5rem',
-    border: '1px solid #FFE1BF',
-    flexWrap: 'wrap',
-  },
-  infoBoxLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.9rem',
-  },
-  infoAvatar: {
-    width: '42px',
-    height: '42px',
-    borderRadius: '12px',
-    background: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '1.3rem',
-    border: '1px solid #FFE1BF',
-    flexShrink: 0,
-  },
-  infoName: {
-    color: '#1E2A45',
-    fontSize: '1rem',
-    fontFamily: "'Poppins', sans-serif",
-  },
-  infoMeta: {
-    color: '#A85400',
-    fontWeight: '500',
-    fontSize: '0.85rem',
-    marginTop: '0.25rem',
-  },
-
-  // ── Filter toolbar ──────────────────────────────────────────
-  filterRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '1rem',
-    marginBottom: '1.75rem',
-    paddingBottom: '1.5rem',
-    borderBottom: '1px solid #EEF1F8',
-  },
-  filterItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.4rem',
-  },
-  label: {
-    fontWeight: '600',
-    color: '#5B6A88',
-    fontSize: '0.78rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  },
-  select: {
-    padding: '0.7rem 0.9rem',
-    borderRadius: '10px',
-    border: '1.5px solid #E4E8F1',
-    fontSize: '0.9rem',
-    color: '#1E2A45',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
-    outline: 'none',
-    backgroundColor: 'white',
-  },
-
-  // ── Table section ──────────────────────────────────────────
-  tableWrapper: {
-    marginTop: '0.25rem',
-  },
-  tableHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '1.1rem',
-    padding: '0 0.1rem',
-  },
-  tableTitle: {
-    fontSize: '1.05rem',
-    fontWeight: '700',
-    color: '#1E2A45',
-    margin: 0,
-    fontFamily: "'Poppins', sans-serif",
-  },
-  badgeCount: {
-    backgroundColor: '#FFEEDD',
-    color: '#C15A00',
-    padding: '0.3rem 0.9rem',
-    borderRadius: '999px',
-    fontSize: '0.78rem',
-    fontWeight: '700',
-    letterSpacing: '0.02em',
-  },
-
-  // ── Day section ──────────────────────────────────────────────
-  daySection: {
-    marginBottom: '1.5rem',
-    borderRadius: '14px',
-    border: '1px solid #EEF1F8',
-    overflow: 'hidden',
-  },
-  dayHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: '#FAFBFF',
-    padding: '0.85rem 1.1rem',
-    borderBottom: '1px solid #EEF1F8',
-  },
-  dayTitle: {
-    margin: 0,
-    color: '#C15A00',
-    fontSize: '0.95rem',
-    fontWeight: '700',
-    fontFamily: "'Poppins', sans-serif",
-  },
-  dayCount: {
-    color: '#8A96AD',
-    fontSize: '0.78rem',
-    fontWeight: '700',
-    backgroundColor: '#FFEEDD',
-    padding: '0.25rem 0.7rem',
-    borderRadius: '999px',
-  },
-
-  // ── Empty / loading / error states ─────────────────────────
-  emptyState: {
+  errorCard: {
     textAlign: 'center',
-    padding: '3.5rem 2rem',
-    backgroundColor: '#FAFBFF',
-    borderRadius: '16px',
-    color: '#9AA5BC',
-    border: '2px dashed #E4E8F1',
+    backgroundColor: '#FDF1F2',
+    borderLeft: '4px solid #E5484D',
   },
-  emptyIcon: {
-    fontSize: '3rem',
+  errorIcon: {
+    fontSize: '2rem',
     display: 'block',
-    marginBottom: '1rem',
+    marginBottom: '0.75rem',
   },
+  errorText: {
+    color: '#C0392B',
+    fontWeight: '600',
+    margin: 0,
+  },
+
   loading: {
     textAlign: 'center',
     padding: '3rem',
@@ -658,50 +389,82 @@ const styles = {
     fontSize: '1rem',
     fontWeight: '600',
   },
-  errorBox: {
-    padding: '1.25rem',
-    borderRadius: '14px',
-    backgroundColor: '#FDF1F2',
-    borderLeft: '4px solid #E5484D',
-    color: '#B91C1C',
-    fontWeight: '500',
+
+  // ── Name banner ──────────────────────────────────────────────
+  nameBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1.1rem',
+    paddingBottom: '1.5rem',
+    marginBottom: '1.5rem',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  avatarCircle: {
+    width: '60px',
+    height: '60px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.4rem',
+    fontWeight: '700',
+    fontFamily: "'Poppins', sans-serif",
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
+    flexShrink: 0,
+  },
+  nameBannerName: {
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+    marginBottom: '0.4rem',
   },
 
-  // ── Table ──────────────────────────────────────────────────
-  tableContainer: {
-    overflowX: 'auto',
+  // ── Section grid ─────────────────────────────────────────────
+  sectionsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: '1.25rem',
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    backgroundColor: 'white',
-  },
-  tableHeaderRow: {
+  section: {
+    padding: '1.25rem 1.4rem',
     backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    border: '1px solid #EEF1F8',
   },
-  th: {
-    padding: '0.85rem 1rem',
-    textAlign: 'left',
+  sectionTitle: {
+    margin: '0 0 1rem 0',
+    fontSize: '0.95rem',
     fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+  },
+  fieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.9rem',
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.35rem',
+  },
+  label: {
+    fontWeight: '600',
     color: '#8A96AD',
     fontSize: '0.72rem',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    whiteSpace: 'nowrap',
-    borderBottom: '1px solid #EEF1F8',
   },
-  td: {
-    padding: '0.85rem 1rem',
+  value: {
+    fontSize: '0.9rem',
     color: '#42506B',
-    fontSize: '0.875rem',
-    verticalAlign: 'middle',
-  },
-  tableRow: {
-    borderBottom: '1px solid #F3F5FA',
-    transition: 'background-color 0.15s',
+    fontWeight: '500',
   },
 
-  // ── Data badges (pill style) ────────────────────────────────
+  // ── Data badges (pill style, matches DosenPage) ─────────────
   badgeCode: {
     backgroundColor: '#EDEBFF',
     color: '#5B4FE0',
@@ -712,6 +475,7 @@ const styles = {
     display: 'inline-block',
     fontFamily: 'monospace',
     letterSpacing: '0.03em',
+    width: 'fit-content',
   },
   badgeDate: {
     backgroundColor: '#F3F5FA',
@@ -719,9 +483,29 @@ const styles = {
     padding: '0.2rem 0.75rem',
     borderRadius: '999px',
     fontSize: '0.8rem',
+    fontWeight: '500',
+    display: 'inline-block',
+    width: 'fit-content',
+  },
+  badgeMale: {
+    backgroundColor: '#E7EEFF',
+    color: '#3E5EF0',
+    padding: '0.2rem 0.75rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
-    whiteSpace: 'nowrap',
+    width: 'fit-content',
+  },
+  badgeFemale: {
+    backgroundColor: '#FDE8F1',
+    color: '#E0448A',
+    padding: '0.2rem 0.75rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    display: 'inline-block',
+    width: 'fit-content',
   },
   badgeProdi: {
     backgroundColor: '#E4F7F0',
@@ -731,5 +515,6 @@ const styles = {
     fontSize: '0.8rem',
     fontWeight: '500',
     display: 'inline-block',
+    width: 'fit-content',
   },
 };
