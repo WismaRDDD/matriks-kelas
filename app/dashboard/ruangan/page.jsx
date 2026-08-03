@@ -29,7 +29,7 @@ export default function RuanganPage() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
-  // ✅ Fix 2: Safe JSON parser — checks content-type before parsing
+  // Safe JSON parser — checks content-type before parsing
   const safeJson = async (res) => {
     const contentType = res.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
@@ -44,12 +44,12 @@ export default function RuanganPage() {
       setLoading(true);
       const res = await fetch('/api/ruangan');
       const json = await safeJson(res);
-      // ✅ Fix 1: Guard against non-array API responses
+      // Guard against non-array API responses
       setData(Array.isArray(json) ? json : []);
       setSelectedIds([]);
     } catch (error) {
       showMessage('error', 'Gagal memuat data: ' + error.message);
-      setData([]); // ✅ Fix 1: Ensure data is always an array
+      setData([]); // Ensure data is always an array
     } finally {
       setLoading(false);
     }
@@ -57,6 +57,7 @@ export default function RuanganPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showMessage = (type, text) => {
@@ -146,12 +147,12 @@ export default function RuanganPage() {
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
+      showMessage('success', '✅ Template berhasil diunduh');
     } catch (error) {
-      showMessage('error', error.message);
+      showMessage('error', `❌ ${error.message}`);
     }
   };
 
-  // ✅ Fix 3: Renamed parameter from 'data' to 'rowData' to avoid shadowing the state variable
   const handleEdit = (rowData) => {
     setForm({
       id: rowData.id,
@@ -199,7 +200,7 @@ export default function RuanganPage() {
       fetchData();
     } catch (error) {
       showMessage('error', error.message);
-      // ✅ Fix 5: Reset file state on failed import so user can retry
+      // Reset file state on failed import so user can retry
       setFile(null);
       const fileInput = document.getElementById('fileInput');
       if (fileInput) fileInput.value = '';
@@ -294,289 +295,373 @@ export default function RuanganPage() {
   }
 
   const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
+    if (sortConfig.key !== key) return '↕';
     if (sortConfig.direction === 'asc') return '↑';
     if (sortConfig.direction === 'desc') return '↓';
-    return '↕️';
+    return '↕';
   };
+
+  // Dashboard summary stats (Edumy-style stat widgets)
+  const totalRuangan = data.length;
+  const totalKapasitas = data.reduce((sum, d) => sum + (parseInt(d.f_kapasitas_kuliah, 10) || 0), 0);
+  const rataKapasitas = totalRuangan > 0 ? Math.round(totalKapasitas / totalRuangan) : 0;
+  const totalLantai = new Set(data.map((d) => d.lantai).filter((v) => v !== null && v !== undefined && v !== '')).size;
+
+  // Add hover styles + font import on client side only
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
+      button:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      input:hover, select:hover, textarea:hover {
+        border-color: #FF7A00 !important;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
+      }
+
+      tr.edumy-row:hover {
+        background-color: #FFF6EC !important;
+      }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>🏢 Dashboard Ruangan</h1>
+      <div style={styles.pageWrap}>
 
-        {/* Message Display */}
-        {messagePopup.show && (
-          <div style={styles.modal} onClick={closeMessagePopup}>
-            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
-              <h2 style={styles.popupTitle}>{messagePopup.type === 'success' ? '✅' : '❌'}</h2>
-              <p style={styles.popupText}>{messagePopup.text}</p>
-              <button style={styles.btnClose} onClick={closeMessagePopup}>Tutup</button>
-            </div>
+        {/* Edumy-style breadcrumb / page header */}
+        <div style={styles.pageHeader}>
+          <div>
+            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Manajemen Akademik <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Ruangan</span></div>
+            <h1 style={styles.title}>Data Ruangan</h1>
+            <p style={styles.subtitle}>Kelola data ruangan, kapasitas, dan impor data ruangan.</p>
           </div>
-        )}
-
-        {/* Import Stats Modal */}
-        {importStats.show && (
-          <div style={styles.modal} onClick={closeImportStats}>
-            <div style={styles.modalContentSmall} onClick={(e) => e.stopPropagation()}>
-              <h2 style={styles.popupTitle}>📊 Hasil Import</h2>
-              <div style={styles.statsContainer}>
-                <div style={styles.statBox}>
-                  <div style={styles.statNumber}>{importStats.success}</div>
-                  <div style={styles.statLabel}>Sukses</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statNumber}>{importStats.duplicate}</div>
-                  <div style={styles.statLabel}>Duplikat</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statNumber}>{importStats.failed}</div>
-                  <div style={styles.statLabel}>Gagal</div>
-                </div>
-              </div>
-              <button style={styles.btnClose} onClick={closeImportStats}>Tutup</button>
-            </div>
-          </div>
-        )}
-
-        {/* Toolbar */}
-        <div style={styles.toolbar}>
-          <div style={styles.toolbarLeft}>
-            <button style={styles.btnPrimary} onClick={handleAddNew}>
-              ➕ Tambah Ruangan
-            </button>
-            <button style={styles.btnInfo} onClick={handleDownloadTemplate}>
-              📥 Download Template
-            </button>
-            <button
-              style={styles.btnSuccess}
-              onClick={() => document.getElementById('fileInput').click()}
-            >
-              📂 Import Excel
-            </button>
-            <button style={styles.btnDanger} onClick={handleDeleteSelected}>
-              🗑️ Hapus ({selectedIds.length})
-            </button>
+          <div style={styles.headerIconWrap}>
+            <span style={styles.headerIcon}>🏢</span>
           </div>
         </div>
 
-        {/* File Upload Section */}
-        {file && (
-          <div style={styles.fileInfo}>
-            <span>📎 {file.name}</span>
-            <button
-              style={styles.btnSuccess}
-              onClick={handleImport}
-              disabled={uploading}
-            >
-              {uploading ? '⏳ Mengupload...' : '📤 Upload'}
-            </button>
-            <button style={styles.btnSecondary} onClick={() => setFile(null)}>
-              ❌ Batal
-            </button>
-          </div>
-        )}
-
-        <input
-          id="fileInput"
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          hidden
-          onChange={(e) => setFile(e.target.files[0])}
-        />
-
-        {/* Table Section */}
-        <div style={styles.tableWrapper}>
-          <div style={styles.tableHeader}>
-            <h2 style={styles.tableTitle}>📋 Daftar Ruangan</h2>
-            <span style={styles.badge}>Total: {data.length} ruangan</span>
-          </div>
-
-          {loading ? (
-            <div style={styles.loading}>⏳ Memuat data...</div>
-          ) : data.length === 0 ? (
-            <div style={styles.emptyState}>
-              <span style={styles.emptyIcon}>📭</span>
-              <p>Belum ada data ruangan</p>
-              <small>Klik &quot;Tambah Ruangan&quot; atau import dari Excel</small>
+        {/* Stat widgets */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>🏢</div>
+            <div>
+              <div style={styles.statNumber}>{totalRuangan}</div>
+              <div style={styles.statLabel}>Total Ruangan</div>
             </div>
-          ) : (
-            <div style={styles.tableContainer}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.tableHeaderRow}>
-                    <th style={styles.thCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={
-                          selectedIds.length === sortedData.length &&
-                          sortedData.length > 0
-                        }
-                        onChange={handleSelectAll}
-                        style={styles.checkbox}
-                      />
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_koderuang')}>
-                      Kode Ruang {renderSortIcon('f_koderuang')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_namaruang')}>
-                      Nama Ruang {renderSortIcon('f_namaruang')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_kapasitas_kuliah')}>
-                      Kapasitas {renderSortIcon('f_kapasitas_kuliah')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('lantai')}>
-                      Lantai {renderSortIcon('lantai')}
-                    </th>
-                    <th style={styles.th}>Alamat</th>
-                    <th style={styles.thAksi}>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedData.map((d, index) => (
-                    <tr
-                      key={d.id}
-                      style={index % 2 === 0 ? styles.tableRowEven : styles.tableRow}
-                    >
-                      <td style={styles.tdCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(d.id)}
-                          onChange={() => handleSelect(d.id)}
-                          style={styles.checkbox}
-                        />
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeCode}>{d.f_koderuang}</span>
-                      </td>
-                      <td style={styles.td}>
-                        <strong>{d.f_namaruang}</strong>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeCapacity}>
-                          👥 {d.f_kapasitas_kuliah || '-'} orang
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeCapacity}>{d.lantai || '-'}</span>
-                      </td>
-                      <td style={styles.td}>{d.f_alamatruang || '-'}</td>
-                      <td style={styles.tdAksi}>
-                        <button
-                          style={styles.btnIconPrimary}
-                          onClick={() => handleEdit(d)}
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          style={styles.btnIconDanger}
-                          onClick={() => handleDeleteOne(d.id, d.f_namaruang)}
-                          title="Hapus"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E7EEFF', color: '#3E5EF0' }}>👥</div>
+            <div>
+              <div style={styles.statNumber}>{totalKapasitas}</div>
+              <div style={styles.statLabel}>Total Kapasitas</div>
+            </div>
+          </div>
+          <div style={{ ...styles.statCard }}>
+            <div style={{ ...styles.statIcon, background: '#FDE8F1', color: '#E0448A' }}>📊</div>
+            <div>
+              <div style={styles.statNumber}>{rataKapasitas}</div>
+              <div style={styles.statLabel}>Rata-rata Kapasitas</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#12B886' }}>🏬</div>
+            <div>
+              <div style={styles.statNumber}>{totalLantai}</div>
+              <div style={styles.statLabel}>Jumlah Lantai</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          {/* Toolbar */}
+          <div style={styles.toolbar}>
+            <div style={styles.toolbarLeft}>
+              <button style={styles.btnPrimary} onClick={handleAddNew}>
+                ➕ Tambah Ruangan
+              </button>
+              <button style={styles.btnOutlineTeal} onClick={handleDownloadTemplate}>
+                📥 Download Template
+              </button>
+              <button style={styles.btnOutlineTeal} onClick={() => document.getElementById('fileInput').click()}>
+                📂 Import Excel
+              </button>
+              <button style={styles.btnDanger} onClick={handleDeleteSelected}>
+                🗑️ Hapus ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+
+          {/* File Upload Section */}
+          {file && (
+            <div style={styles.fileInfo}>
+              <span>📎 {file.name}</span>
+              <button style={styles.btnPrimarySmall} onClick={handleImport} disabled={uploading}>
+                {uploading ? '⏳ Mengupload...' : '📤 Upload'}
+              </button>
+              <button style={styles.btnSecondary} onClick={() => setFile(null)}>
+                ❌ Batal
+              </button>
             </div>
           )}
+
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => setFile(e.target.files[0])} />
+
+          {/* Table Section */}
+          <div style={styles.tableWrapper}>
+            <div style={styles.tableHeader}>
+              <h2 style={styles.tableTitle}>📋 Daftar Ruangan</h2>
+              <span style={styles.badgeCount}>Total: {data.length} ruangan</span>
+            </div>
+
+            {loading ? (
+              <div style={styles.loading}>⏳ Memuat data...</div>
+            ) : data.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={styles.emptyIcon}>📭</span>
+                <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada data ruangan</p>
+                <small style={{ color: '#8A96AD' }}>Klik &quot;Tambah Ruangan&quot; atau import dari Excel</small>
+              </div>
+            ) : (
+              <div style={styles.tableContainer}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHeaderRow}>
+                      <th style={styles.thCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === sortedData.length && sortedData.length > 0}
+                          onChange={handleSelectAll}
+                          style={styles.checkbox}
+                        />
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_koderuang')}>
+                        Kode Ruang <span style={styles.sortIcon}>{renderSortIcon('f_koderuang')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_namaruang')}>
+                        Nama Ruang <span style={styles.sortIcon}>{renderSortIcon('f_namaruang')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_kapasitas_kuliah')}>
+                        Kapasitas <span style={styles.sortIcon}>{renderSortIcon('f_kapasitas_kuliah')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('lantai')}>
+                        Lantai <span style={styles.sortIcon}>{renderSortIcon('lantai')}</span>
+                      </th>
+                      <th style={styles.th}>Alamat</th>
+                      <th style={styles.thAksi}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedData.map((d) => (
+                      <tr key={d.id} className="edumy-row" style={styles.tableRow}>
+                        <td style={styles.tdCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(d.id)}
+                            onChange={() => handleSelect(d.id)}
+                            style={styles.checkbox}
+                          />
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeCode}>{d.f_koderuang}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <strong style={{ color: '#2B3654' }}>{d.f_namaruang}</strong>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeCapacity}>👥 {d.f_kapasitas_kuliah || '-'} orang</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeProdi}>{d.lantai || '-'}</span>
+                        </td>
+                        <td style={styles.td}>{d.f_alamatruang || '-'}</td>
+                        <td style={styles.tdAksi}>
+                          <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit Ruangan">
+                            ✏️
+                          </button>
+                          <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namaruang)} title="Hapus">
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modal Pesan Popup */}
+      {messagePopup.show && (
+        <div style={styles.modal} onClick={closeMessagePopup}>
+          <div
+            style={{
+              ...styles.modalContentSmall,
+              ...(messagePopup.type === 'success' ? styles.popupSuccess : styles.popupError),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={styles.popupIcon}>
+              {messagePopup.type === 'success' ? '✅' : '❌'}
+            </div>
+            <p style={styles.popupText}>{messagePopup.text}</p>
+            <button style={styles.btnClose} onClick={closeMessagePopup}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Import Stats */}
+      {importStats.show && (
+        <div style={styles.modal} onClick={closeImportStats}>
+          <div
+            style={styles.modalContentSmall}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={styles.popupTitle}>📊 Hasil Import</h3>
+            <div style={styles.statsContainer}>
+              <div style={{ ...styles.statBox, ...styles.statSuccess }}>
+                <div style={styles.statBoxNumber}>{importStats.success}</div>
+                <div style={styles.statBoxLabel}>Berhasil</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statWarning }}>
+                <div style={styles.statBoxNumber}>{importStats.duplicate}</div>
+                <div style={styles.statBoxLabel}>Duplikat</div>
+              </div>
+              <div style={{ ...styles.statBox, ...styles.statError }}>
+                <div style={styles.statBoxNumber}>{importStats.failed}</div>
+                <div style={styles.statBoxLabel}>Gagal</div>
+              </div>
+            </div>
+            <button style={styles.btnClose} onClick={closeImportStats}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Form */}
       {showForm && (
         <div style={styles.modal} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>
-              {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
-            </h3>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Kode Ruangan *</label>
-              <input
-                style={styles.input}
-                name="f_koderuang"
-                value={form.f_koderuang}
-                onChange={handleChange}
-                placeholder="Contoh: R-101"
-              />
+            <div style={styles.modalHeaderBar}>
+              <h3 style={styles.modalTitle}>
+                {form.id ? '✏️ Edit Ruangan' : '➕ Tambah Ruangan'}
+              </h3>
             </div>
+            <div style={styles.modalBody}>
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Kode Ruangan *</label>
+                  <input
+                    style={styles.input}
+                    name="f_koderuang"
+                    value={form.f_koderuang}
+                    onChange={handleChange}
+                    placeholder="Contoh: R-101"
+                  />
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Nama Ruangan *</label>
-              <input
-                style={styles.input}
-                name="f_namaruang"
-                value={form.f_namaruang}
-                onChange={handleChange}
-                placeholder="Contoh: Ruang Kelas A"
-              />
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Nama Ruangan *</label>
+                  <input
+                    style={styles.input}
+                    name="f_namaruang"
+                    value={form.f_namaruang}
+                    onChange={handleChange}
+                    placeholder="Contoh: Ruang Kelas A"
+                  />
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Kapasitas</label>
-              <input
-                style={styles.input}
-                name="f_kapasitas_kuliah"
-                value={form.f_kapasitas_kuliah}
-                onChange={handleChange}
-                placeholder="Jumlah kapasitas (angka)"
-                type="number"
-              />
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Kapasitas</label>
+                  <input
+                    style={styles.input}
+                    name="f_kapasitas_kuliah"
+                    value={form.f_kapasitas_kuliah}
+                    onChange={handleChange}
+                    placeholder="Jumlah kapasitas (angka)"
+                    type="number"
+                  />
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Lantai</label>
-              <input
-                style={styles.input}
-                name="lantai"
-                value={form.lantai}
-                onChange={handleChange}
-                placeholder="Nomor lantai"
-                type="number"
-              />
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Lantai</label>
+                  <input
+                    style={styles.input}
+                    name="lantai"
+                    value={form.lantai}
+                    onChange={handleChange}
+                    placeholder="Nomor lantai"
+                    type="number"
+                  />
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>ID Ruang</label>
-              <input
-                style={styles.input}
-                name="f_ruang_id"
-                value={form.f_ruang_id}
-                onChange={handleChange}
-                placeholder="ID ruangan"
-              />
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>ID Ruang</label>
+                  <input
+                    style={styles.input}
+                    name="f_ruang_id"
+                    value={form.f_ruang_id}
+                    onChange={handleChange}
+                    placeholder="ID ruangan"
+                  />
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Alamat</label>
-              <textarea
-                style={styles.textarea}
-                name="f_alamatruang"
-                value={form.f_alamatruang}
-                onChange={handleChange}
-                placeholder="Alamat atau lokasi ruangan"
-                rows="3"
-              />
-            </div>
+                <div style={{ ...styles.formGroup, gridColumn: '1 / -1' }}>
+                  <label style={styles.label}>Alamat</label>
+                  <textarea
+                    style={styles.textarea}
+                    name="f_alamatruang"
+                    value={form.f_alamatruang}
+                    onChange={handleChange}
+                    placeholder="Alamat atau lokasi ruangan"
+                    rows="3"
+                  />
+                </div>
+              </div>
 
-            <div style={styles.modalActions}>
-              <button style={styles.btnPrimary} onClick={handleSubmit}>
-                💾 Simpan
-              </button>
-              <button
-                style={styles.btnSecondary}
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-              >
-                ❌ Batal
-              </button>
+              <div style={styles.modalActions}>
+                <button style={styles.btnPrimary} onClick={handleSubmit}>
+                  💾 Simpan
+                </button>
+                <button
+                  style={styles.btnSecondary}
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                >
+                  ❌ Batal
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -585,202 +670,250 @@ export default function RuanganPage() {
   );
 }
 
+
+// ── Edumy-inspired design tokens ──────────────────────────────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
+
 const styles = {
 
   // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    background: '#f4f6fb',
+    background: '#F3F5FA',
     padding: '2rem',
-    fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
   },
 
-  // ── Main white card ───────────────────────────────────────
-  card: {
+  pageWrap: {
     maxWidth: '1400px',
     margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.09)',
-    overflow: 'hidden',
   },
 
-  // ── Gradient title bar ────────────────────────────────────
-  titleBar: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.25rem 2rem',
+  // ── Header / breadcrumb ─────────────────────────────────────
+  pageHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: '1.5rem',
+    gap: '1rem',
+    flexWrap: 'wrap',
+  },
+  breadcrumb: {
+    fontSize: '0.8rem',
+    color: '#9AA5BC',
+    fontWeight: '500',
+    marginBottom: '0.5rem',
+  },
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
+  },
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
   },
   title: {
-    fontSize: '1.5rem',
+    fontSize: '1.9rem',
     fontWeight: '700',
-    color: '#000000',
+    color: '#1E2A45',
     margin: 0,
-    letterSpacing: '0.02em',
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
   },
-  titleBreadcrumb: {
-    fontSize: '0.82rem',
-    color: 'rgba(255,255,255,0.72)',
-    margin: 0,
+  subtitle: {
+    fontSize: '0.9rem',
+    color: '#8A96AD',
+    margin: '0.35rem 0 0 0',
   },
-
-  // Inner body padding
-  cardBody: {
-    padding: '2rem',
-  },
-
-  // ── Alert messages ────────────────────────────────────────
-  message: {
-    padding: '0.9rem 1.25rem',
-    borderRadius: '8px',
-    marginBottom: '1.5rem',
-    fontWeight: '500',
-    fontSize: '0.875rem',
-    whiteSpace: 'pre-line',
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
   },
-  messageSuccess: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-    border: '1px solid #a5d6a7',
-  },
-  messageError: {
-    backgroundColor: '#fce4ec',
-    color: '#b71c1c',
-    border: '1px solid #ef9a9a',
+  headerIcon: {
+    fontSize: '1.6rem',
   },
 
-  // ── Toolbar ───────────────────────────────────────────────
+  // ── Stat widgets ────────────────────────────────────────────
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '1.1rem',
+    marginBottom: '1.5rem',
+  },
+  statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '1.15rem 1.25rem',
+    boxShadow: '0 4px 18px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+  },
+  statIcon: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.25rem',
+    flexShrink: 0,
+  },
+  statNumber: {
+    fontSize: '1.45rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+    lineHeight: 1.1,
+  },
+  statLabel: {
+    fontSize: '0.8rem',
+    color: '#8A96AD',
+    fontWeight: '500',
+    marginTop: '0.15rem',
+  },
+
+  // ── Main card ────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '1.75rem',
+  },
+
+  // ── Toolbar ────────────────────────────────────────────────
   toolbar: {
     marginBottom: '1.5rem',
-    padding: '1rem 1.25rem',
-    backgroundColor: '#f8f9fe',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
+    paddingBottom: '1.25rem',
+    borderBottom: '1px solid #EEF1F8',
   },
   toolbarLeft: {
     display: 'flex',
-    gap: '0.65rem',
+    gap: '0.7rem',
     flexWrap: 'wrap',
     alignItems: 'center',
   },
 
-  // ── Buttons ───────────────────────────────────────────────
+  // ── Buttons (Edumy pill style) ──────────────────────────────
   btnPrimary: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    padding: '0.6rem 1.35rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(123,31,162,0.3)',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
     transition: 'opacity 0.2s, transform 0.1s',
   },
-  btnSuccess: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #00897b, #00695c)',
+  btnPrimarySmall: {
+    padding: '0.5rem 1.1rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(0,137,123,0.3)',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+  },
+  btnOutlineTeal: {
+    padding: '0.6rem 1.35rem',
+    background: '#E4F7F0',
+    color: '#0E9B6E',
+    border: '1px solid #C3EEDF',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
     transition: 'opacity 0.2s, transform 0.1s',
   },
   btnDanger: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #e53935, #b71c1c)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    padding: '0.6rem 1.35rem',
+    background: '#FDEBEE',
+    color: '#E5484D',
+    border: '1px solid #F8CDD3',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(229,57,53,0.3)',
-    transition: 'opacity 0.2s, transform 0.1s',
-  },
-  btnInfo: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #1e88e5, #1565c0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(30,136,229,0.3)',
     transition: 'opacity 0.2s, transform 0.1s',
   },
   btnSecondary: {
-    padding: '0.55rem 1.2rem',
-    background: '#eceff1',
-    color: '#455a64',
-    border: '1px solid #cfd8dc',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    padding: '0.6rem 1.35rem',
+    background: '#F3F5FA',
+    color: '#5B6A88',
+    border: '1px solid #E4E8F1',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'background 0.2s',
   },
 
-  // ── File info strip ───────────────────────────────────────
+  // ── File info strip ────────────────────────────────────────
   fileInfo: {
-    backgroundColor: '#e8eaf6',
+    backgroundColor: '#FFF6EC',
     padding: '0.75rem 1.25rem',
-    borderRadius: '8px',
+    borderRadius: '14px',
     marginBottom: '1.5rem',
     display: 'flex',
     gap: '0.75rem',
     alignItems: 'center',
     flexWrap: 'wrap',
-    border: '1px solid #c5cae9',
+    border: '1px solid #FFE1BF',
     fontSize: '0.875rem',
+    color: '#A85400',
     fontWeight: '500',
-    color: '#283593',
   },
 
-  // ── Table section ─────────────────────────────────────────
+  // ── Table section ──────────────────────────────────────────
   tableWrapper: {
-    marginTop: '1.5rem',
+    marginTop: '0.25rem',
   },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '0.75rem',
-    padding: '0 0.25rem',
+    marginBottom: '0.9rem',
+    padding: '0 0.1rem',
   },
-    tableTitle: {
+  tableTitle: {
     fontSize: '1.05rem',
     fontWeight: '700',
-    color: '#37474f',
+    color: '#1E2A45',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
-  badge: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
-    padding: '0.25rem 0.85rem',
-    borderRadius: '20px',
-    fontSize: '0.8rem',
-    fontWeight: '600',
+  badgeCount: {
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
+    padding: '0.3rem 0.9rem',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '700',
     letterSpacing: '0.02em',
   },
 
-  // ── Empty / loading states ────────────────────────────────
+  // ── Empty / loading states ─────────────────────────────────
   emptyState: {
     textAlign: 'center',
     padding: '3.5rem 2rem',
-    backgroundColor: '#fafbff',
-    borderRadius: '12px',
-    color: '#90a4ae',
-    border: '2px dashed #e8eaf6',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    color: '#9AA5BC',
+    border: '2px dashed #E4E8F1',
   },
   emptyIcon: {
     fontSize: '3rem',
@@ -790,17 +923,16 @@ const styles = {
   loading: {
     textAlign: 'center',
     padding: '3rem',
-    color: '#7b1fa2',
+    color: '#FF7A00',
     fontSize: '1rem',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
-  // ── Table ─────────────────────────────────────────────────
+  // ── Table ──────────────────────────────────────────────────
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
   },
   table: {
     width: '100%',
@@ -808,39 +940,45 @@ const styles = {
     backgroundColor: 'white',
   },
   tableHeaderRow: {
-    background: 'linear-gradient(135deg, #7b1fa2 0%, #4527a0 100%)',
+    backgroundColor: '#FAFBFF',
   },
   th: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     textAlign: 'left',
     fontWeight: '700',
-    color: '#ffffff',
-    fontSize: '0.78rem',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  sortIcon: {
+    color: '#FF7A00',
+    fontWeight: '700',
   },
   thCheckbox: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     width: '44px',
     textAlign: 'center',
-    color: '#ffffff',
+    borderBottom: '1px solid #EEF1F8',
   },
   thAksi: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     width: '110px',
     textAlign: 'center',
-    color: '#ffffff',
-    fontSize: '0.78rem',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
+    borderBottom: '1px solid #EEF1F8',
   },
   td: {
     padding: '0.85rem 1rem',
-    color: '#37474f',
+    color: '#42506B',
     fontSize: '0.875rem',
     verticalAlign: 'middle',
   },
@@ -856,143 +994,78 @@ const styles = {
     verticalAlign: 'middle',
   },
   tableRow: {
-    borderBottom: '1px solid #f0f2ff',
+    borderBottom: '1px solid #F3F5FA',
     transition: 'background-color 0.15s',
-  },
-  tableRowEven: {
-    backgroundColor: '#fafbff',
-    borderBottom: '1px solid #f0f2ff',
   },
   checkbox: {
     cursor: 'pointer',
     width: '17px',
     height: '17px',
-    accentColor: '#7b1fa2',
+    accentColor: '#FF7A00',
   },
 
-  // ── Data badges ───────────────────────────────────────────
+  // ── Data badges (pill style) ────────────────────────────────
   badgeCode: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
+    backgroundColor: '#EDEBFF',
+    color: '#5B4FE0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '700',
     display: 'inline-block',
+    fontFamily: 'monospace',
     letterSpacing: '0.03em',
   },
   badgeCapacity: {
-    backgroundColor: '#fff3e0',
-    color: '#e65100',
+    backgroundColor: '#E7EEFF',
+    color: '#3E5EF0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
   },
-  badgeId: {
-    backgroundColor: '#e0f2f1',
-    color: '#004d40',
+  badgeProdi: {
+    backgroundColor: '#E4F7F0',
+    color: '#0E9B6E',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
-    fontWeight: '600',
+    fontWeight: '500',
     display: 'inline-block',
   },
 
-  // ── Row action icon-buttons ───────────────────────────────
+  // ── Row action icon-buttons ────────────────────────────────
   btnIconPrimary: {
-    background: '#ede7f6',
+    background: '#EDEBFF',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.95rem',
     cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
     transition: 'background 0.2s',
     marginRight: '0.4rem',
-    color: '#4527a0',
+    color: '#5B4FE0',
   },
   btnIconDanger: {
-    background: '#fce4ec',
+    background: '#FDEBEE',
     border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
-    transition: 'background 0.2s',
-    color: '#b71c1c',
-  },
-
-  // ── Popup modal styling ───────────────────────────────────
-  modalContentSmall: {
-    background: 'white',
-    borderRadius: '14px',
-    width: '360px',
-    maxWidth: '90vw',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-    overflow: 'hidden',
-    padding: '2rem',
-    textAlign: 'center',
-  },
-  popupTitle: {
-    fontSize: '2.5rem',
-    margin: '0 0 1rem 0',
-    lineHeight: 1,
-  },
-  popupText: {
     fontSize: '0.95rem',
-    color: '#37474f',
-    margin: '0 0 1.5rem 0',
-    lineHeight: '1.5',
-    whiteSpace: 'pre-line',
-  },
-  statsContainer: {
-    display: 'flex',
-    gap: '1rem',
-    marginBottom: '1.5rem',
-    justifyContent: 'center',
-  },
-  statBox: {
-    flex: '1',
-    minWidth: '80px',
-    padding: '1rem',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '10px',
-    border: '1px solid #e0e0e0',
-  },
-  statNumber: {
-    fontSize: '1.8rem',
-    fontWeight: '700',
-    color: '#1565c0',
-    marginBottom: '0.3rem',
-  },
-  statLabel: {
-    fontSize: '0.75rem',
-    color: '#666',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  btnClose: {
-    padding: '0.6rem 1.5rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
     cursor: 'pointer',
-    transition: 'opacity 0.2s',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
+    transition: 'background 0.2s',
+    color: '#E5484D',
   },
 
-  // ── Modal overlay ─────────────────────────────────────────
+  // ── Modal overlay + content ────────────────────────────────
   modal: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(30,10,50,0.55)',
+    background: 'rgba(20,24,40,0.5)',
     backdropFilter: 'blur(3px)',
     display: 'flex',
     justifyContent: 'center',
@@ -1001,87 +1074,164 @@ const styles = {
   },
   modalContent: {
     background: 'white',
-    borderRadius: '14px',
-    minWidth: '460px',
+    borderRadius: '20px',
+    minWidth: '600px',
     maxWidth: '90vw',
     maxHeight: '90vh',
     overflowY: 'auto',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-    overflow: 'hidden',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
   },
-
-  // Gradient header bar inside modal
-  modalHeader: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.1rem 1.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  modalHeaderBar: {
+    padding: '1.25rem 1.75rem',
+    borderBottom: '1px solid #EEF1F8',
+    background: '#FAFBFF',
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px',
   },
   modalTitle: {
     fontSize: '1.15rem',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1E2A45',
     margin: 0,
-  },
-  modalCloseBtn: {
-    background: 'rgba(255,255,255,0.2)',
-    border: 'none',
-    color: 'white',
-    fontSize: '1.1rem',
-    cursor: 'pointer',
-    borderRadius: '6px',
-    padding: '0.2rem 0.6rem',
-    lineHeight: 1,
+    fontFamily: "'Poppins', sans-serif",
   },
   modalBody: {
     padding: '1.75rem',
-    overflowY: 'auto',
   },
   modalActions: {
     display: 'flex',
     gap: '0.75rem',
     justifyContent: 'flex-end',
     marginTop: '1.5rem',
-    paddingTop: '1rem',
-    borderTop: '1px solid #f0f2ff',
+    paddingTop: '1.25rem',
+    borderTop: '1px solid #EEF1F8',
   },
 
-  // ── Form elements ─────────────────────────────────────────
+  // ── Form grid inside modal ─────────────────────────────────
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '1rem',
+  },
   formGroup: {
-    marginBottom: '1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
   },
   label: {
-    display: 'block',
-    marginBottom: '0.4rem',
-    fontWeight: '700',
-    color: '#4a5568',
+    fontWeight: '600',
+    color: '#5B6A88',
     fontSize: '0.78rem',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
   },
   input: {
-    width: '100%',
     padding: '0.7rem 0.9rem',
-    borderRadius: '8px',
-    border: '1.5px solid #e8eaf6',
-    fontSize: '0.875rem',
-    color: '#37474f',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.9rem',
+    color: '#1E2A45',
     boxSizing: 'border-box',
-    outline: 'none',
     transition: 'border-color 0.2s, box-shadow 0.2s',
+    outline: 'none',
   },
   textarea: {
-    width: '100%',
     padding: '0.7rem 0.9rem',
-    borderRadius: '8px',
-    border: '1.5px solid #e8eaf6',
-    fontSize: '0.875rem',
-    color: '#37474f',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.9rem',
+    color: '#1E2A45',
     boxSizing: 'border-box',
     fontFamily: 'inherit',
     resize: 'vertical',
-    outline: 'none',
     transition: 'border-color 0.2s, box-shadow 0.2s',
+    outline: 'none',
+    width: '100%',
+  },
+
+  // ── Popup Modal ────────────────────────────────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '20px',
+    minWidth: '350px',
+    maxWidth: '85vw',
+    padding: '2rem',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
+    textAlign: 'center',
+  },
+  popupIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  popupText: {
+    color: '#1E2A45',
+    fontSize: '1rem',
+    fontWeight: '500',
+    marginBottom: '1.5rem',
+    lineHeight: '1.5',
+  },
+  popupTitle: {
+    color: '#1E2A45',
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    marginBottom: '1.5rem',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+  },
+  popupSuccess: {
+    backgroundColor: '#F0FBF6',
+    borderLeft: '4px solid #12B886',
+  },
+  popupError: {
+    backgroundColor: '#FDF1F2',
+    borderLeft: '4px solid #E5484D',
+  },
+  btnClose: {
+    padding: '0.6rem 1.6rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '999px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+    transition: 'opacity 0.2s',
+  },
+
+  // ── Import Stats ───────────────────────────────────────────
+  statsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+  },
+  statBox: {
+    padding: '1.5rem 1rem',
+    borderRadius: '14px',
+    textAlign: 'center',
+  },
+  statSuccess: {
+    backgroundColor: '#F0FBF6',
+  },
+  statWarning: {
+    backgroundColor: '#FFF6EC',
+  },
+  statError: {
+    backgroundColor: '#FDF1F2',
+  },
+  statBoxNumber: {
+    fontSize: '2rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    marginBottom: '0.5rem',
+    fontFamily: "'Poppins', sans-serif",
+  },
+  statBoxLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#5B6A88',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
   },
 };
