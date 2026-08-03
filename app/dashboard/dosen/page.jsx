@@ -138,7 +138,7 @@ export default function DosenPage() {
         showMessage('error', 'Tanggal lahir tidak valid');
         return;
       }
-      
+
       const year = date.getFullYear();
       const currentYear = new Date().getFullYear();
       if (year < 1950 || year > currentYear) {
@@ -297,10 +297,10 @@ export default function DosenPage() {
     setPreferences((prev) => {
       const updated = { ...prev };
       if (!updated[day]) updated[day] = {};
-      
+
       // Check if ALL sessions for this day are checked
       const allSessionsChecked = sessions.length > 0 && sessions.every((session) => updated[day]?.[session]);
-      
+
       // Explicit logic: uncheck ONLY if all are checked, otherwise check all
       const newValue = allSessionsChecked ? false : true;
       sessions.forEach((session) => {
@@ -313,10 +313,10 @@ export default function DosenPage() {
   const handleSelectAllDaysForSession = (session, days) => {
     setPreferences((prev) => {
       const updated = { ...prev };
-      
+
       // Check if ALL days for this session are checked
       const allDaysChecked = days.every((day) => updated[day]?.[session]);
-      
+
       // Explicit logic: uncheck ONLY if all are checked, otherwise check all
       const newValue = allDaysChecked ? false : true;
       days.forEach((day) => {
@@ -331,7 +331,7 @@ export default function DosenPage() {
     setPreferences((prev) => {
       const updated = { ...prev };
       const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      
+
       // Count total and checked items
       let totalItems = 0;
       let checkedItems = 0;
@@ -341,7 +341,7 @@ export default function DosenPage() {
           if (updated[day][session]) checkedItems++;
         });
       });
-      
+
       // Explicit logic: uncheck ONLY if all are checked, otherwise check all
       const allChecked = totalItems > 0 && checkedItems === totalItems;
       const newValue = allChecked ? false : true;
@@ -362,15 +362,15 @@ export default function DosenPage() {
     if (!jamMulai || !jamSelesai || !durasi) {
       return sessions;
     }
-    
+
     const durasiNumber = typeof durasi === 'string' ? parseInt(durasi, 10) : durasi;
     let current = jamBulaiToMinutes(jamMulai);
     const end = jamBulaiToMinutes(jamSelesai);
-    
+
     // Get break times based on day
     let breakStart = null;
     let breakEnd = null;
-    
+
     if (preset) {
       if (day === 'Jumat') {
         breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_jumat);
@@ -384,11 +384,11 @@ export default function DosenPage() {
         breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_senin_kamis);
       }
     }
-    
+
     while (current < end) {
       const sessionStart = current;
       const sessionEnd = current + durasiNumber;
-      
+
       // Skip this session if it overlaps with break time
       if (breakStart !== null && breakEnd !== null) {
         if (sessionEnd > breakStart && sessionStart < breakEnd) {
@@ -397,7 +397,7 @@ export default function DosenPage() {
           continue;
         }
       }
-      
+
       const start = minutesToTime(sessionStart);
       const finish = minutesToTime(sessionEnd);
       sessions.push(`${start}-${finish}`);
@@ -422,7 +422,7 @@ export default function DosenPage() {
       const preferredFloors = Object.keys(floorPreferences)
         .filter(floor => floorPreferences[floor])
         .join(',');
-      
+
       const res = await fetch('/api/dosen/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -450,11 +450,11 @@ export default function DosenPage() {
   const downloadTemplate = async () => {
     try {
       const res = await fetch('/api/dosen/import');
-      
+
       if (!res.ok) {
         throw new Error('Download template gagal');
       }
-      
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -464,7 +464,7 @@ export default function DosenPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       showMessage('success', '✅ Template berhasil diunduh');
     } catch (error) {
       showMessage('error', `❌ ${error.message}`);
@@ -626,179 +626,242 @@ export default function DosenPage() {
   }
 
   const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
+    if (sortConfig.key !== key) return '↕';
     if (sortConfig.direction === 'asc') return '↑';
     if (sortConfig.direction === 'desc') return '↓';
-    return '↕️';
+    return '↕';
   };
 
-  // Add hover styles on client side only
+  // Dashboard summary stats (Edumy-style stat widgets)
+  const totalDosen = data.length;
+  const totalLaki = data.filter((d) => d.f_jeniskelamin === 'L').length;
+  const totalPerempuan = data.filter((d) => d.f_jeniskelamin === 'P').length;
+  const totalProdi = new Set(data.map((d) => d.f_progdi_id).filter(Boolean)).size;
+
+  // Add hover styles + font import on client side only
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    
+
     const styleSheet = document.createElement('style');
     styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
       button:hover {
-        opacity: 0.85;
+        opacity: 0.92;
         transform: translateY(-1px);
       }
-      
-      input:hover, select:hover, textarea:hover {
-        border-color: #667eea;
+
+      button:active {
+        transform: translateY(0);
       }
-      
+
+      input:hover, select:hover, textarea:hover {
+        border-color: #FF7A00 !important;
+      }
+
       input:focus, select:focus, textarea:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
       }
-      
-      tr:hover {
-        background-color: #f7fafc !important;
+
+      tr.edumy-row:hover {
+        background-color: #FFF6EC !important;
       }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
     `;
     document.head.appendChild(styleSheet);
   }, []);
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>👨‍🏫 Dashboard Dosen</h1>
+      <div style={styles.pageWrap}>
 
-        {/* Message Display - REMOVED, replaced with modal */}
-
-        {/* Toolbar */}
-        <div style={styles.toolbar}>
-          <div style={styles.toolbarLeft}>
-            <button style={styles.btnPrimary} onClick={handleAddNew}>
-              ➕ Tambah Dosen
-            </button>
-            <button style={styles.btnSuccess} onClick={downloadTemplate}>
-              📥 Download Template
-            </button>
-            <button style={styles.btnSuccess} onClick={() => document.getElementById('fileInput').click()}>
-              📂 Import Excel
-            </button>
-            <button style={styles.btnDanger} onClick={handleDeleteSelected}>
-              🗑️ Hapus ({selectedIds.length})
-            </button>
+        {/* Edumy-style breadcrumb / page header */}
+        <div style={styles.pageHeader}>
+          <div>
+            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Manajemen Akademik <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Dosen</span></div>
+            <h1 style={styles.title}>Data Dosen</h1>
+            <p style={styles.subtitle}>Kelola biodata, preferensi jadwal, dan impor data dosen.</p>
+          </div>
+          <div style={styles.headerIconWrap}>
+            <span style={styles.headerIcon}>🎓</span>
           </div>
         </div>
 
-        {/* File Upload Section */}
-        {file && (
-          <div style={styles.fileInfo}>
-            <span>📎 {file.name}</span>
-            <button style={styles.btnSuccess} onClick={handleImport} disabled={uploading}>
-              {uploading ? '⏳ Mengupload...' : '📤 Upload'}
-            </button>
-            <button style={styles.btnSecondary} onClick={() => setFile(null)}>
-              ❌ Batal
-            </button>
-          </div>
-        )}
-
-        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => setFile(e.target.files[0])} />
-
-        {/* Table Section */}
-        <div style={styles.tableWrapper}>
-          <div style={styles.tableHeader}>
-            <h2 style={styles.tableTitle}>📋 Daftar Dosen</h2>
-            <span style={styles.badge}>Total: {data.length} dosen</span>
-          </div>
-
-          {loading ? (
-            <div style={styles.loading}>⏳ Memuat data...</div>
-          ) : data.length === 0 ? (
-            <div style={styles.emptyState}>
-              <span style={styles.emptyIcon}>📭</span>
-              <p>Belum ada data dosen</p>
-              <small>Klik &quot;Tambah Dosen&quot; atau import dari Excel</small>
+        {/* Stat widgets */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>👥</div>
+            <div>
+              <div style={styles.statNumber}>{totalDosen}</div>
+              <div style={styles.statLabel}>Total Dosen</div>
             </div>
-          ) : (
-            <div style={styles.tableContainer}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.tableHeaderRow}>
-                    <th style={styles.thCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.length === sortedData.length && sortedData.length > 0}
-                        onChange={handleSelectAll}
-                        style={styles.checkbox}
-                      />
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nidn')}>
-                      NIDN {renderSortIcon('f_nidn')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_nip')}>
-                      NIP {renderSortIcon('f_nip')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>
-                      Nama Lengkap {renderSortIcon('f_namapegawai')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>
-                      Tempat Lahir {renderSortIcon('f_tempatlahir')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>
-                      Tanggal Lahir {renderSortIcon('f_tanggallahir')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>
-                      JK {renderSortIcon('f_jeniskelamin')}
-                    </th>
-                    <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>
-                      Prodi ID {renderSortIcon('f_progdi_id')}
-                    </th>
-                    <th style={styles.thAksi}>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedData.map((d, index) => (
-                    <tr key={d.id} style={index % 2 === 0 ? styles.tableRowEven : styles.tableRow}>
-                      <td style={styles.tdCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(d.id)}
-                          onChange={() => handleSelect(d.id)}
-                          style={styles.checkbox}
-                        />
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeCode}>{d.f_nidn}</span>
-                      </td>
-                      <td style={styles.td}>{d.f_nip}</td>
-                      <td style={styles.td}>
-                        <strong>{formatNamaLengkap(d)}</strong>
-                      </td>
-                      <td style={styles.td}>{d.f_tempatlahir || '-'}</td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeDate}>{formatDateDisplay(d.f_tanggallahir)}</span>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={d.f_jeniskelamin === 'L' ? styles.badgeMale : styles.badgeFemale}>
-                          {d.f_jeniskelamin === 'L' ? '♂ Laki-laki' : d.f_jeniskelamin === 'P' ? '♀ Perempuan' : '-'}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
-                      </td>
-                      <td style={styles.tdAksi}>
-                        <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit Biodata">
-                          ✏️
-                        </button>
-                        <button style={styles.btnIconInfo} onClick={() => handleEditPreference(d)} title="Edit Preferensi">
-                          📅
-                        </button>
-                        <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-               </table>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E7EEFF', color: '#3E5EF0' }}>♂</div>
+            <div>
+              <div style={styles.statNumber}>{totalLaki}</div>
+              <div style={styles.statLabel}>Dosen Laki-laki</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FDE8F1', color: '#E0448A' }}>♀</div>
+            <div>
+              <div style={styles.statNumber}>{totalPerempuan}</div>
+              <div style={styles.statLabel}>Dosen Perempuan</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#12B886' }}>📚</div>
+            <div>
+              <div style={styles.statNumber}>{totalProdi}</div>
+              <div style={styles.statLabel}>Program Studi</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          {/* Toolbar */}
+          <div style={styles.toolbar}>
+            <div style={styles.toolbarLeft}>
+              <button style={styles.btnPrimary} onClick={handleAddNew}>
+                ➕ Tambah Dosen
+              </button>
+              <button style={styles.btnOutlineTeal} onClick={downloadTemplate}>
+                📥 Download Template
+              </button>
+              <button style={styles.btnOutlineTeal} onClick={() => document.getElementById('fileInput').click()}>
+                📂 Import Excel
+              </button>
+              <button style={styles.btnDanger} onClick={handleDeleteSelected}>
+                🗑️ Hapus ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+
+          {/* File Upload Section */}
+          {file && (
+            <div style={styles.fileInfo}>
+              <span>📎 {file.name}</span>
+              <button style={styles.btnPrimarySmall} onClick={handleImport} disabled={uploading}>
+                {uploading ? '⏳ Mengupload...' : '📤 Upload'}
+              </button>
+              <button style={styles.btnSecondary} onClick={() => setFile(null)}>
+                ❌ Batal
+              </button>
             </div>
           )}
+
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => setFile(e.target.files[0])} />
+
+          {/* Table Section */}
+          <div style={styles.tableWrapper}>
+            <div style={styles.tableHeader}>
+              <h2 style={styles.tableTitle}>📋 Daftar Dosen</h2>
+              <span style={styles.badgeCount}>Total: {data.length} dosen</span>
+            </div>
+
+            {loading ? (
+              <div style={styles.loading}>⏳ Memuat data...</div>
+            ) : data.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={styles.emptyIcon}>📭</span>
+                <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada data dosen</p>
+                <small style={{ color: '#8A96AD' }}>Klik &quot;Tambah Dosen&quot; atau import dari Excel</small>
+              </div>
+            ) : (
+              <div style={styles.tableContainer}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHeaderRow}>
+                      <th style={styles.thCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === sortedData.length && sortedData.length > 0}
+                          onChange={handleSelectAll}
+                          style={styles.checkbox}
+                        />
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_nidn')}>
+                        NIDN <span style={styles.sortIcon}>{renderSortIcon('f_nidn')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_nip')}>
+                        NIP <span style={styles.sortIcon}>{renderSortIcon('f_nip')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_namapegawai')}>
+                        Nama Lengkap <span style={styles.sortIcon}>{renderSortIcon('f_namapegawai')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_tempatlahir')}>
+                        Tempat Lahir <span style={styles.sortIcon}>{renderSortIcon('f_tempatlahir')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_tanggallahir')}>
+                        Tanggal Lahir <span style={styles.sortIcon}>{renderSortIcon('f_tanggallahir')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_jeniskelamin')}>
+                        JK <span style={styles.sortIcon}>{renderSortIcon('f_jeniskelamin')}</span>
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('f_progdi_id')}>
+                        Prodi ID <span style={styles.sortIcon}>{renderSortIcon('f_progdi_id')}</span>
+                      </th>
+                      <th style={styles.thAksi}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedData.map((d) => (
+                      <tr key={d.id} className="edumy-row" style={styles.tableRow}>
+                        <td style={styles.tdCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(d.id)}
+                            onChange={() => handleSelect(d.id)}
+                            style={styles.checkbox}
+                          />
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeCode}>{d.f_nidn}</span>
+                        </td>
+                        <td style={styles.td}>{d.f_nip}</td>
+                        <td style={styles.td}>
+                          <strong style={{ color: '#2B3654' }}>{formatNamaLengkap(d)}</strong>
+                        </td>
+                        <td style={styles.td}>{d.f_tempatlahir || '-'}</td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeDate}>{formatDateDisplay(d.f_tanggallahir)}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={d.f_jeniskelamin === 'L' ? styles.badgeMale : styles.badgeFemale}>
+                            {d.f_jeniskelamin === 'L' ? '♂ Laki-laki' : d.f_jeniskelamin === 'P' ? '♀ Perempuan' : '-'}
+                          </span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeProdi}>{d.f_progdi_id || '-'}</span>
+                        </td>
+                        <td style={styles.tdAksi}>
+                          <button style={styles.btnIconPrimary} onClick={() => handleEdit(d)} title="Edit Biodata">
+                            ✏️
+                          </button>
+                          <button style={styles.btnIconInfo} onClick={() => handleEditPreference(d)} title="Edit Preferensi">
+                            📅
+                          </button>
+                          <button style={styles.btnIconDanger} onClick={() => handleDeleteOne(d.id, d.f_namapegawai)} title="Hapus">
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -833,16 +896,16 @@ export default function DosenPage() {
             <h3 style={styles.popupTitle}>📊 Hasil Import</h3>
             <div style={styles.statsContainer}>
               <div style={{ ...styles.statBox, ...styles.statSuccess }}>
-                <div style={styles.statNumber}>{importStats.success}</div>
-                <div style={styles.statLabel}>Berhasil</div>
+                <div style={styles.statBoxNumber}>{importStats.success}</div>
+                <div style={styles.statBoxLabel}>Berhasil</div>
               </div>
               <div style={{ ...styles.statBox, ...styles.statWarning }}>
-                <div style={styles.statNumber}>{importStats.duplicate}</div>
-                <div style={styles.statLabel}>Duplikat</div>
+                <div style={styles.statBoxNumber}>{importStats.duplicate}</div>
+                <div style={styles.statBoxLabel}>Duplikat</div>
               </div>
               <div style={{ ...styles.statBox, ...styles.statError }}>
-                <div style={styles.statNumber}>{importStats.failed}</div>
-                <div style={styles.statLabel}>Gagal</div>
+                <div style={styles.statBoxNumber}>{importStats.failed}</div>
+                <div style={styles.statBoxLabel}>Gagal</div>
               </div>
             </div>
             <button style={styles.btnClose} onClick={closeImportStats}>
@@ -856,135 +919,138 @@ export default function DosenPage() {
       {showForm && (
         <div style={styles.modal} onClick={() => setShowForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>
-              {form.id ? '✏️ Edit Biodata Dosen' : '➕ Tambah Dosen'}
-            </h3>
+            <div style={styles.modalHeaderBar}>
+              <h3 style={styles.modalTitle}>
+                {form.id ? '✏️ Edit Biodata Dosen' : '➕ Tambah Dosen'}
+              </h3>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>NIDN *</label>
+                  <input
+                    style={styles.input}
+                    name="f_nidn"
+                    value={form.f_nidn}
+                    onChange={handleChange}
+                    placeholder="10 atau 12 digit angka"
+                    disabled={!!form.id}
+                    maxLength="12"
+                  />
+                </div>
 
-            <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>NIDN *</label>
-                <input
-                  style={styles.input}
-                  name="f_nidn"
-                  value={form.f_nidn}
-                  onChange={handleChange}
-                  placeholder="10 atau 12 digit angka"
-                  disabled={!!form.id}
-                  maxLength="12"
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>NIP *</label>
+                  <input
+                    style={styles.input}
+                    name="f_nip"
+                    value={form.f_nip}
+                    onChange={handleChange}
+                    placeholder="Nomor Induk Pegawai"
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>NIP *</label>
-                <input
-                  style={styles.input}
-                  name="f_nip"
-                  value={form.f_nip}
-                  onChange={handleChange}
-                  placeholder="Nomor Induk Pegawai"
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Gelar Depan</label>
+                  <input
+                    style={styles.input}
+                    name="f_title_depan"
+                    value={form.f_title_depan}
+                    onChange={handleChange}
+                    placeholder="Contoh: Dr., Prof."
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Gelar Depan</label>
-                <input
-                  style={styles.input}
-                  name="f_title_depan"
-                  value={form.f_title_depan}
-                  onChange={handleChange}
-                  placeholder="Contoh: Dr., Prof."
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Nama Dosen *</label>
+                  <input
+                    style={styles.input}
+                    name="f_namapegawai"
+                    value={form.f_namapegawai}
+                    onChange={handleChange}
+                    placeholder="Nama lengkap"
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Nama Dosen *</label>
-                <input
-                  style={styles.input}
-                  name="f_namapegawai"
-                  value={form.f_namapegawai}
-                  onChange={handleChange}
-                  placeholder="Nama lengkap"
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Gelar Belakang</label>
+                  <input
+                    style={styles.input}
+                    name="f_title_belakang"
+                    value={form.f_title_belakang}
+                    onChange={handleChange}
+                    placeholder="Contoh: M.Kom., Ph.D"
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Gelar Belakang</label>
-                <input
-                  style={styles.input}
-                  name="f_title_belakang"
-                  value={form.f_title_belakang}
-                  onChange={handleChange}
-                  placeholder="Contoh: M.Kom., Ph.D"
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tempat Lahir</label>
+                  <input
+                    style={styles.input}
+                    name="f_tempatlahir"
+                    value={form.f_tempatlahir}
+                    onChange={handleChange}
+                    placeholder="Kota tempat lahir"
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tempat Lahir</label>
-                <input
-                  style={styles.input}
-                  name="f_tempatlahir"
-                  value={form.f_tempatlahir}
-                  onChange={handleChange}
-                  placeholder="Kota tempat lahir"
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tanggal Lahir</label>
+                  <input
+                    style={styles.input}
+                    type="date"
+                    name="f_tanggallahir"
+                    value={form.f_tanggallahir}
+                    onChange={handleChange}
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tanggal Lahir</label>
-                <input
-                  style={styles.input}
-                  type="date"
-                  name="f_tanggallahir"
-                  value={form.f_tanggallahir}
-                  onChange={handleChange}
-                />
-              </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Program Studi ID</label>
+                  <input
+                    style={styles.input}
+                    name="f_progdi_id"
+                    value={form.f_progdi_id}
+                    onChange={handleChange}
+                    placeholder="ID Program Studi"
+                  />
+                </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Program Studi ID</label>
-                <input
-                  style={styles.input}
-                  name="f_progdi_id"
-                  value={form.f_progdi_id}
-                  onChange={handleChange}
-                  placeholder="ID Program Studi"
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Jenis Kelamin</label>
-                <div style={styles.radioGroup}>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="L"
-                      checked={form.f_jeniskelamin === 'L'}
-                      onChange={handleChange}
-                    />
-                    <span>♂ Laki-laki</span>
-                  </label>
-                  <label style={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="f_jeniskelamin"
-                      value="P"
-                      checked={form.f_jeniskelamin === 'P'}
-                      onChange={handleChange}
-                    />
-                    <span>♀ Perempuan</span>
-                  </label>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Jenis Kelamin</label>
+                  <div style={styles.radioGroup}>
+                    <label style={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="f_jeniskelamin"
+                        value="L"
+                        checked={form.f_jeniskelamin === 'L'}
+                        onChange={handleChange}
+                      />
+                      <span>♂ Laki-laki</span>
+                    </label>
+                    <label style={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="f_jeniskelamin"
+                        value="P"
+                        checked={form.f_jeniskelamin === 'P'}
+                        onChange={handleChange}
+                      />
+                      <span>♀ Perempuan</span>
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div style={styles.modalActions}>
-              <button style={styles.btnPrimary} onClick={handleSubmit}>
-                💾 Simpan
-              </button>
-              <button style={styles.btnSecondary} onClick={() => setShowForm(false)}>
-                ❌ Batal
-              </button>
+              <div style={styles.modalActions}>
+                <button style={styles.btnPrimary} onClick={handleSubmit}>
+                  💾 Simpan
+                </button>
+                <button style={styles.btnSecondary} onClick={() => setShowForm(false)}>
+                  ❌ Batal
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -994,145 +1060,149 @@ export default function DosenPage() {
       {showPreferenceForm && (
         <div style={styles.modal} onClick={() => setShowPreferenceForm(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalTitleRow}>
-              <h3 style={styles.modalTitle}>📅 Preferensi Dosen - {form.f_namapegawai}</h3>
-              <span style={isDefaultPreferenceState() ? styles.statusBadgeDefault : styles.statusBadgeCustom}>
-                {isDefaultPreferenceState() ? 'Default' : 'Custom'}
-              </span>
+            <div style={styles.modalHeaderBar}>
+              <div style={styles.modalTitleRow}>
+                <h3 style={styles.modalTitle}>📅 Preferensi Dosen - {form.f_namapegawai}</h3>
+                <span style={isDefaultPreferenceState() ? styles.statusBadgeDefault : styles.statusBadgeCustom}>
+                  {isDefaultPreferenceState() ? 'Default' : 'Custom'}
+                </span>
+              </div>
             </div>
 
-            {presets.length > 0 && presets[0]?.jam_mulai ? (
-              <>
-                <div style={styles.presetInfo}>
-                  <strong>📋 Preset:</strong> {presets[0].nama_preset || 'Default'}
-                  <span style={styles.presetDetails}>
-                    ({presets[0].jam_mulai} - {presets[0].jam_selesai}, Durasi: {presets[0].durasi_slot} menit)
-                  </span>
-                </div>
-
-                {/* Floor Preferences Section */}
-                <div style={{...styles.presetInfo, marginTop: '1rem'}}>
-                  <strong>🏢 Preferensi Lantai:</strong>
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                    {[1, 2, 3, 4].map((floor) => (
-                      <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#37474f', fontWeight: '500' }}>
-                        <input
-                          type="checkbox"
-                          checked={floorPreferences[floor] || false}
-                          onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#7b1fa2' }}
-                        />
-                        Lantai {floor}
-                      </label>
-                    ))}
+            <div style={styles.modalBody}>
+              {presets.length > 0 && presets[0]?.jam_mulai ? (
+                <>
+                  <div style={styles.presetInfo}>
+                    <strong>📋 Preset:</strong> {presets[0].nama_preset || 'Default'}
+                    <span style={styles.presetDetails}>
+                      ({presets[0].jam_mulai} - {presets[0].jam_selesai}, Durasi: {presets[0].durasi_slot} menit)
+                    </span>
                   </div>
-                </div>
 
-                <div style={styles.preferenceGrid}>
-                  <table style={styles.preferenceTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.preferenceHeaderCell}>
+                  {/* Floor Preferences Section */}
+                  <div style={{ ...styles.presetInfo, marginTop: '1rem' }}>
+                    <strong>🏢 Preferensi Lantai:</strong>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                      {[1, 2, 3, 4].map((floor) => (
+                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#42506B', fontWeight: '500' }}>
                           <input
                             type="checkbox"
-                            checked={(() => {
-                              const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                              return days.every((day) =>
-                                Object.keys(preferences[day] || {}).every((session) => preferences[day][session])
-                              );
-                            })()}
-                            onChange={handleSelectAllPreferences}
-                            style={styles.checkbox}
-                            title="Pilih semua"
+                            checked={floorPreferences[floor] || false}
+                            onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#FF7A00' }}
                           />
-                        </th>
-                        <th style={styles.preferenceHeaderCell}>Hari</th>
-                        {(() => {
-                          const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], 'Senin');
-                          return sessions.map((session) => (
-                            <th key={session} style={styles.preferenceHeaderCell}>
-                              <div style={styles.sessionHeaderDiv}>
-                                <span>{session}</span>
+                          Lantai {floor}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={styles.preferenceGrid}>
+                    <table style={styles.preferenceTable}>
+                      <thead>
+                        <tr>
+                          <th style={styles.preferenceHeaderCell}>
+                            <input
+                              type="checkbox"
+                              checked={(() => {
+                                const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                                return days.every((day) =>
+                                  Object.keys(preferences[day] || {}).every((session) => preferences[day][session])
+                                );
+                              })()}
+                              onChange={handleSelectAllPreferences}
+                              style={styles.checkbox}
+                              title="Pilih semua"
+                            />
+                          </th>
+                          <th style={styles.preferenceHeaderCell}>Hari</th>
+                          {(() => {
+                            const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], 'Senin');
+                            return sessions.map((session) => (
+                              <th key={session} style={styles.preferenceHeaderCell}>
+                                <div style={styles.sessionHeaderDiv}>
+                                  <span>{session}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={(() => {
+                                      const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                                      const dayCount = days.length;
+                                      const checkedCount = days.filter((day) => preferences[day]?.[session]).length;
+                                      return dayCount > 0 && checkedCount === dayCount;
+                                    })()}
+                                    onChange={() => handleSelectAllDaysForSession(session, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'])}
+                                    style={styles.checkboxSmall}
+                                    title={`Pilih semua hari untuk ${session}`}
+                                  />
+                                </div>
+                              </th>
+                            ));
+                          })()}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
+                          const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], day);
+                          const allSessionsChecked = sessions.length > 0 && sessions.every((session) => preferences[day]?.[session]);
+                          return (
+                            <tr key={day}>
+                              <td style={styles.preferenceCell}>
                                 <input
                                   type="checkbox"
-                                  checked={(() => {
-                                    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                                    const dayCount = days.length;
-                                    const checkedCount = days.filter((day) => preferences[day]?.[session]).length;
-                                    return dayCount > 0 && checkedCount === dayCount;
-                                  })()}
-                                  onChange={() => handleSelectAllDaysForSession(session, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'])}
-                                  style={styles.checkboxSmall}
-                                  title={`Pilih semua hari untuk ${session}`}
-                                />
-                              </div>
-                            </th>
-                          ));
-                        })()}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
-                        const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], day);
-                        const allSessionsChecked = sessions.length > 0 && sessions.every((session) => preferences[day]?.[session]);
-                        return (
-                          <tr key={day}>
-                            <td style={styles.preferenceCell}>
-                              <input
-                                type="checkbox"
-                                checked={allSessionsChecked}
-                                onChange={() => handleSelectAllSessionsForDay(day, sessions)}
-                                style={styles.checkbox}
-                                title={`Pilih semua sesi untuk ${day}`}
-                              />
-                            </td>
-                            <td style={styles.preferenceRowHeader}>{day}</td>
-                            {sessions.map((session) => (
-                              <td key={session} style={styles.preferenceCell}>
-                                <input
-                                  type="checkbox"
-                                  checked={preferences[day]?.[session] || false}
-                                  onChange={(e) => {
-                                    setPreferences({
-                                      ...preferences,
-                                      [day]: {
-                                        ...preferences[day],
-                                        [session]: e.target.checked
-                                      }
-                                    });
-                                  }}
+                                  checked={allSessionsChecked}
+                                  onChange={() => handleSelectAllSessionsForDay(day, sessions)}
                                   style={styles.checkbox}
-                                  title={`${day} jam ${session}`}
+                                  title={`Pilih semua sesi untuk ${day}`}
                                 />
                               </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              <td style={styles.preferenceRowHeader}>{day}</td>
+                              {sessions.map((session) => (
+                                <td key={session} style={styles.preferenceCell}>
+                                  <input
+                                    type="checkbox"
+                                    checked={preferences[day]?.[session] || false}
+                                    onChange={(e) => {
+                                      setPreferences({
+                                        ...preferences,
+                                        [day]: {
+                                          ...preferences[day],
+                                          [session]: e.target.checked
+                                        }
+                                      });
+                                    }}
+                                    style={styles.checkbox}
+                                    title={`${day} jam ${session}`}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                <div style={styles.presetLegend}>
-                  <small>✅ = Tersedia | ❌ = Tidak tersedia | Default: Semua hari tersedia kecuali Sabtu</small>
+                  <div style={styles.presetLegend}>
+                    <small>✅ = Tersedia | ❌ = Tidak tersedia | Default: Semua hari tersedia kecuali Sabtu</small>
+                  </div>
+                </>
+              ) : (
+                <div style={styles.emptyState}>
+                  <p>⚠️ Belum ada preset jadwal. Silakan buat preset terlebih dahulu di menu Jadwal.</p>
                 </div>
-              </>
-            ) : (
-              <div style={styles.emptyState}>
-                <p>⚠️ Belum ada preset jadwal. Silakan buat preset terlebih dahulu di menu Jadwal.</p>
+              )}
+
+              <div style={styles.modalActions}>
+                <button style={styles.btnSecondary} onClick={handleResetPreferences}>
+                  ↺ Reset ke Default
+                </button>
+                <button style={styles.btnPrimary} onClick={handleSavePreference} disabled={presets.length === 0}>
+                  💾 Simpan
+                </button>
+                <button style={styles.btnSecondary} onClick={() => setShowPreferenceForm(false)}>
+                  ❌ Batal
+                </button>
               </div>
-            )}
-
-            <div style={styles.modalActions}>
-              <button style={styles.btnSecondary} onClick={handleResetPreferences}>
-                ↺ Reset ke Default
-              </button>
-              <button style={styles.btnPrimary} onClick={handleSavePreference} disabled={presets.length === 0}>
-                💾 Simpan
-              </button>
-              <button style={styles.btnSecondary} onClick={() => setShowPreferenceForm(false)}>
-                ❌ Batal
-              </button>
             </div>
           </div>
         </div>
@@ -1142,192 +1212,238 @@ export default function DosenPage() {
 }
 
 
+// ── Edumy-inspired design tokens ──────────────────────────────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
+
 const styles = {
 
   // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    background: '#f4f6fb',           // light blue-grey page bg (like Moodle body)
+    background: '#F3F5FA',
     padding: '2rem',
-    fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
   },
 
-  // ── Top card / header banner ──────────────────────────────
-  card: {
+  pageWrap: {
     maxWidth: '1400px',
     margin: '0 auto',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-    overflow: 'hidden',
   },
 
-  // Page-level title bar (mimics the LeADS gradient header)
-  titleBar: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.25rem 2rem',
+  // ── Header / breadcrumb ─────────────────────────────────────
+  pageHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    color: '#000000',
-    margin: 0,
-    letterSpacing: '0.02em',
-  },
-
-  titleBreadcrumb: {
-    fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.75)',
-    margin: 0,
-  },
-
-  // Inner content padding
-  cardBody: {
-    padding: '2rem',
-  },
-
-  // ── Alert messages ─────────────────────────────────────────
-  message: {
-    padding: '0.9rem 1.25rem',
-    borderRadius: '8px',
     marginBottom: '1.5rem',
+    gap: '1rem',
+    flexWrap: 'wrap',
+  },
+  breadcrumb: {
+    fontSize: '0.8rem',
+    color: '#9AA5BC',
     fontWeight: '500',
+    marginBottom: '0.5rem',
+  },
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
+  },
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: '1.9rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
+  },
+  subtitle: {
     fontSize: '0.9rem',
+    color: '#8A96AD',
+    margin: '0.35rem 0 0 0',
+  },
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
   },
-  messageSuccess: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-    border: '1px solid #a5d6a7',
+  headerIcon: {
+    fontSize: '1.6rem',
   },
-  messageError: {
-    backgroundColor: '#fce4ec',
-    color: '#b71c1c',
-    border: '1px solid #ef9a9a',
+
+  // ── Stat widgets ────────────────────────────────────────────
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '1.1rem',
+    marginBottom: '1.5rem',
+  },
+  statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '1.15rem 1.25rem',
+    boxShadow: '0 4px 18px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+  },
+  statIcon: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.25rem',
+    flexShrink: 0,
+  },
+  statNumber: {
+    fontSize: '1.45rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+    lineHeight: 1.1,
+  },
+  statLabel: {
+    fontSize: '0.8rem',
+    color: '#8A96AD',
+    fontWeight: '500',
+    marginTop: '0.15rem',
+  },
+
+  // ── Main card ────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '1.75rem',
   },
 
   // ── Toolbar ────────────────────────────────────────────────
   toolbar: {
     marginBottom: '1.5rem',
-    padding: '1rem 1.25rem',
-    backgroundColor: '#f8f9fe',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
+    paddingBottom: '1.25rem',
+    borderBottom: '1px solid #EEF1F8',
   },
   toolbarLeft: {
     display: 'flex',
-    gap: '0.75rem',
+    gap: '0.7rem',
     flexWrap: 'wrap',
     alignItems: 'center',
   },
 
-  // ── Buttons (LeADS palette) ────────────────────────────────
+  // ── Buttons (Edumy pill style) ──────────────────────────────
   btnPrimary: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    padding: '0.6rem 1.35rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(123,31,162,0.35)',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
     transition: 'opacity 0.2s, transform 0.1s',
   },
-  btnSuccess: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #00897b, #00695c)',
+  btnPrimarySmall: {
+    padding: '0.5rem 1.1rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(0,137,123,0.35)',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+  },
+  btnOutlineTeal: {
+    padding: '0.6rem 1.35rem',
+    background: '#E4F7F0',
+    color: '#0E9B6E',
+    border: '1px solid #C3EEDF',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
     transition: 'opacity 0.2s, transform 0.1s',
   },
   btnDanger: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #e53935, #b71c1c)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    padding: '0.6rem 1.35rem',
+    background: '#FDEBEE',
+    color: '#E5484D',
+    border: '1px solid #F8CDD3',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(229,57,53,0.35)',
     transition: 'opacity 0.2s, transform 0.1s',
   },
   btnSecondary: {
-    padding: '0.55rem 1.2rem',
-    background: '#eceff1',
-    color: '#455a64',
-    border: '1px solid #cfd8dc',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
+    padding: '0.6rem 1.35rem',
+    background: '#F3F5FA',
+    color: '#5B6A88',
+    border: '1px solid #E4E8F1',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'background 0.2s',
   },
-  btnInfo: {
-    padding: '0.55rem 1.2rem',
-    background: 'linear-gradient(135deg, #1e88e5, #1565c0)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(30,136,229,0.35)',
-    transition: 'opacity 0.2s, transform 0.1s',
-  },
 
   // ── File info strip ────────────────────────────────────────
   fileInfo: {
-    backgroundColor: '#e8eaf6',
+    backgroundColor: '#FFF6EC',
     padding: '0.75rem 1.25rem',
-    borderRadius: '8px',
+    borderRadius: '14px',
     marginBottom: '1.5rem',
     display: 'flex',
     gap: '0.75rem',
     alignItems: 'center',
     flexWrap: 'wrap',
-    border: '1px solid #c5cae9',
+    border: '1px solid #FFE1BF',
     fontSize: '0.875rem',
-    color: '#283593',
+    color: '#A85400',
     fontWeight: '500',
   },
 
   // ── Table section ──────────────────────────────────────────
   tableWrapper: {
-    marginTop: '1.5rem',
+    marginTop: '0.25rem',
   },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '0.75rem',
-    padding: '0 0.25rem',
+    marginBottom: '0.9rem',
+    padding: '0 0.1rem',
   },
   tableTitle: {
     fontSize: '1.05rem',
     fontWeight: '700',
-    color: '#37474f',
+    color: '#1E2A45',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
-  badge: {
-    backgroundColor: '#e8eaf6',
-    color: '#3949ab',
-    padding: '0.25rem 0.85rem',
-    borderRadius: '20px',
-    fontSize: '0.8rem',
-    fontWeight: '600',
+  badgeCount: {
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
+    padding: '0.3rem 0.9rem',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '700',
     letterSpacing: '0.02em',
   },
 
@@ -1335,10 +1451,10 @@ const styles = {
   emptyState: {
     textAlign: 'center',
     padding: '3.5rem 2rem',
-    backgroundColor: '#fafbff',
-    borderRadius: '12px',
-    color: '#90a4ae',
-    border: '2px dashed #e8eaf6',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    color: '#9AA5BC',
+    border: '2px dashed #E4E8F1',
   },
   emptyIcon: {
     fontSize: '3rem',
@@ -1348,17 +1464,16 @@ const styles = {
   loading: {
     textAlign: 'center',
     padding: '3rem',
-    color: '#7b1fa2',
+    color: '#FF7A00',
     fontSize: '1rem',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
   // ── Table ──────────────────────────────────────────────────
   tableContainer: {
     overflowX: 'auto',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
   },
   table: {
     width: '100%',
@@ -1366,39 +1481,45 @@ const styles = {
     backgroundColor: 'white',
   },
   tableHeaderRow: {
-    background: 'linear-gradient(135deg, #7b1fa2 0%, #4527a0 100%)',
+    backgroundColor: '#FAFBFF',
   },
   th: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     textAlign: 'left',
-    fontWeight: '600',
-    color: '#ffffff',
-    fontSize: '0.8rem',
+    fontWeight: '700',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  sortIcon: {
+    color: '#FF7A00',
+    fontWeight: '700',
   },
   thCheckbox: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     width: '44px',
     textAlign: 'center',
-    color: '#ffffff',
+    borderBottom: '1px solid #EEF1F8',
   },
   thAksi: {
-    padding: '0.9rem 1rem',
+    padding: '0.85rem 1rem',
     width: '110px',
     textAlign: 'center',
-    color: '#ffffff',
-    fontSize: '0.8rem',
-    fontWeight: '600',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
+    borderBottom: '1px solid #EEF1F8',
   },
   td: {
     padding: '0.85rem 1rem',
-    color: '#37474f',
+    color: '#42506B',
     fontSize: '0.875rem',
     verticalAlign: 'middle',
   },
@@ -1414,26 +1535,22 @@ const styles = {
     verticalAlign: 'middle',
   },
   tableRow: {
-    borderBottom: '1px solid #f0f2ff',
+    borderBottom: '1px solid #F3F5FA',
     transition: 'background-color 0.15s',
-  },
-  tableRowEven: {
-    backgroundColor: '#fafbff',
-    borderBottom: '1px solid #f0f2ff',
   },
   checkbox: {
     cursor: 'pointer',
     width: '17px',
     height: '17px',
-    accentColor: '#7b1fa2',
+    accentColor: '#FF7A00',
   },
 
-  // ── Data badges ────────────────────────────────────────────
+  // ── Data badges (pill style) ────────────────────────────────
   badgeCode: {
-    backgroundColor: '#ede7f6',
-    color: '#4527a0',
+    backgroundColor: '#EDEBFF',
+    color: '#5B4FE0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '700',
     display: 'inline-block',
@@ -1441,37 +1558,37 @@ const styles = {
     letterSpacing: '0.03em',
   },
   badgeDate: {
-    backgroundColor: '#fff3e0',
-    color: '#e65100',
+    backgroundColor: '#F3F5FA',
+    color: '#5B6A88',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '500',
     display: 'inline-block',
   },
   badgeMale: {
-    backgroundColor: '#e3f2fd',
-    color: '#0d47a1',
+    backgroundColor: '#E7EEFF',
+    color: '#3E5EF0',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
   },
   badgeFemale: {
-    backgroundColor: '#fce4ec',
-    color: '#880e4f',
+    backgroundColor: '#FDE8F1',
+    color: '#E0448A',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '600',
     display: 'inline-block',
   },
   badgeProdi: {
-    backgroundColor: '#e0f2f1',
-    color: '#004d40',
+    backgroundColor: '#E4F7F0',
+    color: '#0E9B6E',
     padding: '0.2rem 0.75rem',
-    borderRadius: '20px',
+    borderRadius: '999px',
     fontSize: '0.8rem',
     fontWeight: '500',
     display: 'inline-block',
@@ -1479,36 +1596,36 @@ const styles = {
 
   // ── Row action icon-buttons ────────────────────────────────
   btnIconPrimary: {
-    background: '#ede7f6',
+    background: '#EDEBFF',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.95rem',
     cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
     transition: 'background 0.2s',
     marginRight: '0.4rem',
-    color: '#4527a0',
+    color: '#5B4FE0',
   },
   btnIconDanger: {
-    background: '#fce4ec',
+    background: '#FDEBEE',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.95rem',
     cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
     transition: 'background 0.2s',
-    color: '#b71c1c',
+    color: '#E5484D',
   },
   btnIconInfo: {
-    background: '#e3f2fd',
+    background: '#FFEEDD',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.95rem',
     cursor: 'pointer',
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
     transition: 'background 0.2s',
     marginRight: '0.4rem',
-    color: '#0d47a1',
+    color: '#C15A00',
   },
 
   // ── Modal overlay + content ────────────────────────────────
@@ -1518,7 +1635,7 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(30,10,50,0.55)',
+    background: 'rgba(20,24,40,0.5)',
     backdropFilter: 'blur(3px)',
     display: 'flex',
     justifyContent: 'center',
@@ -1527,63 +1644,51 @@ const styles = {
   },
   modalContent: {
     background: 'white',
-    borderRadius: '14px',
+    borderRadius: '20px',
     minWidth: '600px',
     maxWidth: '90vw',
     maxHeight: '90vh',
     overflowY: 'auto',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
-    overflow: 'hidden',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
   },
-  // Coloured modal header bar (same gradient as titleBar)
-  modalHeader: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.1rem 1.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  modalHeaderBar: {
+    padding: '1.25rem 1.75rem',
+    borderBottom: '1px solid #EEF1F8',
+    background: '#FAFBFF',
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px',
   },
   modalTitleRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '1rem',
-    marginBottom: '1rem',
     flexWrap: 'wrap',
   },
   modalTitle: {
-    fontSize: '1.2rem',
+    fontSize: '1.15rem',
     fontWeight: '700',
-    color: '#000000',
+    color: '#1E2A45',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
   statusBadgeDefault: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
+    backgroundColor: '#E4F7F0',
+    color: '#0E9B6E',
     borderRadius: '999px',
     padding: '0.35rem 0.75rem',
     fontSize: '0.78rem',
     fontWeight: '700',
-    border: '1px solid #a5d6a7',
+    border: '1px solid #C3EEDF',
   },
   statusBadgeCustom: {
-    backgroundColor: '#fff3e0',
-    color: '#e65100',
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
     borderRadius: '999px',
     padding: '0.35rem 0.75rem',
     fontSize: '0.78rem',
     fontWeight: '700',
-    border: '1px solid #ffcc80',
-  },
-  modalCloseBtn: {
-    background: 'rgba(255,255,255,0.2)',
-    border: 'none',
-    color: 'white',
-    fontSize: '1.2rem',
-    cursor: 'pointer',
-    borderRadius: '6px',
-    padding: '0.2rem 0.6rem',
-    lineHeight: 1,
+    border: '1px solid #FFDBA8',
   },
   modalBody: {
     padding: '1.75rem',
@@ -1593,8 +1698,8 @@ const styles = {
     gap: '0.75rem',
     justifyContent: 'flex-end',
     marginTop: '1.5rem',
-    paddingTop: '1rem',
-    borderTop: '1px solid #f0f2ff',
+    paddingTop: '1.25rem',
+    borderTop: '1px solid #EEF1F8',
   },
 
   // ── Form grid inside modal ─────────────────────────────────
@@ -1610,21 +1715,20 @@ const styles = {
   },
   label: {
     fontWeight: '600',
-    color: '#4a5568',
-    fontSize: '0.8rem',
+    color: '#5B6A88',
+    fontSize: '0.78rem',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
   },
   input: {
     padding: '0.7rem 0.9rem',
-    borderRadius: '8px',
-    border: '1.5px solid #e8eaf6',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
     fontSize: '0.9rem',
-    color: '#37474f',
+    color: '#1E2A45',
     boxSizing: 'border-box',
     transition: 'border-color 0.2s, box-shadow 0.2s',
     outline: 'none',
-    // focus via JS: border-color #7b1fa2, box-shadow 0 0 0 3px rgba(123,31,162,0.15)
   },
   radioGroup: {
     display: 'flex',
@@ -1637,7 +1741,7 @@ const styles = {
     gap: '0.5rem',
     cursor: 'pointer',
     fontSize: '0.9rem',
-    color: '#37474f',
+    color: '#42506B',
     fontWeight: '500',
   },
 
@@ -1645,8 +1749,8 @@ const styles = {
   preferenceGrid: {
     overflowX: 'auto',
     marginBottom: '1.5rem',
-    borderRadius: '10px',
-    border: '1px solid #e8eaf6',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
   },
   preferenceTable: {
     width: '100%',
@@ -1657,53 +1761,53 @@ const styles = {
     padding: '0.65rem 0.5rem',
     textAlign: 'center',
     fontWeight: '700',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
-    color: '#ffffff',
-    border: '1px solid rgba(255,255,255,0.15)',
-    fontSize: '0.78rem',
+    background: '#FAFBFF',
+    color: '#5B6A88',
+    border: '1px solid #EEF1F8',
+    fontSize: '0.75rem',
     letterSpacing: '0.03em',
   },
   preferenceRowHeader: {
     padding: '0.65rem 1rem',
     fontWeight: '700',
-    backgroundColor: '#f3e5f5',
-    border: '1px solid #e8eaf6',
+    backgroundColor: '#FFF6EC',
+    border: '1px solid #EEF1F8',
     minWidth: '80px',
-    color: '#4a148c',
+    color: '#C15A00',
     fontSize: '0.82rem',
   },
   preferenceCell: {
     padding: '0.5rem',
     textAlign: 'center',
-    border: '1px solid #f0f2ff',
+    border: '1px solid #F3F5FA',
   },
 
   // ── Info / preset info block ───────────────────────────────
   presetInfo: {
-    backgroundColor: '#f3e5f5',
+    backgroundColor: '#FFF6EC',
     padding: '1rem 1.25rem',
-    borderRadius: '10px',
+    borderRadius: '14px',
     marginBottom: '1.5rem',
     fontSize: '0.9rem',
-    color: '#4a148c',
-    borderLeft: '4px solid #7b1fa2',
+    color: '#A85400',
+    borderLeft: '4px solid #FF7A00',
     fontWeight: '500',
   },
   presetDetails: {
     display: 'block',
     fontSize: '0.82rem',
-    color: '#6a1b9a',
+    color: '#C15A00',
     marginTop: '0.3rem',
     fontWeight: '400',
   },
   presetLegend: {
     marginTop: '1rem',
     padding: '0.75rem 1rem',
-    backgroundColor: '#fafbff',
-    borderRadius: '8px',
-    color: '#546e7a',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '10px',
+    color: '#8A96AD',
     textAlign: 'center',
-    borderTop: '1px solid #e8eaf6',
+    borderTop: '1px solid #EEF1F8',
     fontSize: '0.82rem',
   },
 
@@ -1718,17 +1822,17 @@ const styles = {
     cursor: 'pointer',
     width: '16px',
     height: '16px',
-    accentColor: '#7b1fa2',
+    accentColor: '#FF7A00',
   },
 
   // ── Popup Modal ────────────────────────────────────────────
   modalContentSmall: {
     background: 'white',
-    borderRadius: '14px',
+    borderRadius: '20px',
     minWidth: '350px',
     maxWidth: '85vw',
     padding: '2rem',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
     textAlign: 'center',
   },
   popupIcon: {
@@ -1736,37 +1840,38 @@ const styles = {
     marginBottom: '1rem',
   },
   popupText: {
-    color: '#000000',
+    color: '#1E2A45',
     fontSize: '1rem',
     fontWeight: '500',
     marginBottom: '1.5rem',
     lineHeight: '1.5',
   },
   popupTitle: {
-    color: '#000000',
+    color: '#1E2A45',
     fontSize: '1.25rem',
     fontWeight: '700',
     marginBottom: '1.5rem',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
   popupSuccess: {
-    backgroundColor: '#e8f5e9',
-    borderLeft: '4px solid #4caf50',
+    backgroundColor: '#F0FBF6',
+    borderLeft: '4px solid #12B886',
   },
   popupError: {
-    backgroundColor: '#fce4ec',
-    borderLeft: '4px solid #e53935',
+    backgroundColor: '#FDF1F2',
+    borderLeft: '4px solid #E5484D',
   },
   btnClose: {
-    padding: '0.6rem 1.5rem',
-    background: 'linear-gradient(135deg, #7b1fa2, #4527a0)',
+    padding: '0.6rem 1.6rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '999px',
     fontSize: '0.9rem',
     fontWeight: '600',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(123,31,162,0.3)',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
     transition: 'opacity 0.2s',
   },
 
@@ -1779,28 +1884,29 @@ const styles = {
   },
   statBox: {
     padding: '1.5rem 1rem',
-    borderRadius: '10px',
+    borderRadius: '14px',
     textAlign: 'center',
   },
   statSuccess: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#F0FBF6',
   },
   statWarning: {
-    backgroundColor: '#fff3e0',
+    backgroundColor: '#FFF6EC',
   },
   statError: {
-    backgroundColor: '#fce4ec',
+    backgroundColor: '#FDF1F2',
   },
-  statNumber: {
+  statBoxNumber: {
     fontSize: '2rem',
     fontWeight: '700',
-    color: '#000000',
+    color: '#1E2A45',
     marginBottom: '0.5rem',
+    fontFamily: "'Poppins', sans-serif",
   },
-  statLabel: {
+  statBoxLabel: {
     fontSize: '0.875rem',
     fontWeight: '600',
-    color: '#000000',
+    color: '#5B6A88',
     textTransform: 'uppercase',
     letterSpacing: '0.02em',
   },
