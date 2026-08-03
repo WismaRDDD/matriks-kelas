@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-// ✅ Fix 3: Moved outside main component to prevent unnecessary re-renders
+// Moved outside main component to prevent unnecessary re-renders
 const SortIndicator = ({ column, sortConfig }) => {
-  if (sortConfig.key !== column) return <span> ⇅</span>;
-  return sortConfig.direction === 'asc' ? <span> ↑</span> : <span> ↓</span>;
+  if (sortConfig.key !== column) return <span style={{ color: '#FF7A00', fontWeight: 700 }}> ⇅</span>;
+  return sortConfig.direction === 'asc' ? (
+    <span style={{ color: '#FF7A00', fontWeight: 700 }}> ↑</span>
+  ) : (
+    <span style={{ color: '#FF7A00', fontWeight: 700 }}> ↓</span>
+  );
 };
 
 export default function TahunAkademikPage() {
@@ -30,7 +34,6 @@ export default function TahunAkademikPage() {
       setLoading(true);
       const res = await fetch('/api/tahun-akademik');
 
-      // ✅ Fix 4: Handle non-JSON responses (e.g. HTML error pages)
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error('Server error: invalid response format');
@@ -38,12 +41,11 @@ export default function TahunAkademikPage() {
 
       const json = await res.json();
 
-      // ✅ Fix 2: Guard against non-array API responses
       setData(Array.isArray(json) ? json : []);
       setSelectedIds([]);
     } catch (error) {
       showMessage('error', 'Gagal memuat data: ' + error.message);
-      setData([]); // ✅ Fix 2: Ensure data is always an array
+      setData([]);
     } finally {
       setLoading(false);
     }
@@ -51,6 +53,48 @@ export default function TahunAkademikPage() {
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Add hover styles + font import on client side only (Edumy theme)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      button { font-family: 'Poppins', 'Jost', sans-serif; }
+
+      button:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      input:hover, select:hover, textarea:hover {
+        border-color: #FF7A00 !important;
+      }
+
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #FF7A00 !important;
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.14) !important;
+      }
+
+      tr.edumy-row:hover {
+        background-color: #FFF6EC !important;
+      }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    `;
+    document.head.appendChild(styleSheet);
   }, []);
 
   const showMessage = (type, text) => {
@@ -112,7 +156,6 @@ export default function TahunAkademikPage() {
   const handleAddNew = () => {
     resetForm();
     if (data.length > 0) {
-      // ✅ Fix 1: Use Number() to prevent string concatenation (e.g. "20241" instead of 2025)
       const lastYear = Number(data[0].tahun_awal) + 1;
       setForm({ id: '', tahun_awal: String(lastYear) });
     }
@@ -207,340 +250,673 @@ export default function TahunAkademikPage() {
     return sorted;
   };
 
+  // Dashboard summary stats (Edumy-style stat widgets)
+  const totalTahun = data.length;
+  const currentYear = new Date().getFullYear();
+  const tahunAktif = data.find((d) => Number(d.tahun_awal) === currentYear);
+  const tahunTerbaru = data.length > 0 ? Math.max(...data.map((d) => Number(d.tahun_awal))) : '-';
+  const tahunTerlama = data.length > 0 ? Math.min(...data.map((d) => Number(d.tahun_awal))) : '-';
+
+  const sortedData = getSortedData();
+
   return (
     <div style={styles.container}>
-      {/* Message Alert */}
-      {message.text && (
-        <div
-          style={{
-            ...styles.message,
-            ...(message.type === 'error' ? styles.messageError : styles.messageSuccess),
-          }}
-        >
-          {message.text}
-        </div>
-      )}
+      <div style={styles.pageWrap}>
 
-      {/* Header & Controls */}
-      <div style={styles.header}>
-        <h2>📅 Tahun Akademik</h2>
-        <div style={styles.controls}>
-          <button onClick={handleAddNew} style={styles.btnPrimary}>
-            + Tambah Tahun Akademik
-          </button>
-          {selectedIds.length > 0 && (
-            <button onClick={handleBulkDelete} style={styles.btnDanger}>
-              🗑️ Hapus ({selectedIds.length})
-            </button>
-          )}
+        {/* Edumy-style breadcrumb / page header */}
+        <div style={styles.pageHeader}>
+          <div>
+            <div style={styles.breadcrumb}>Dashboard <span style={styles.breadcrumbSep}>/</span> Manajemen Akademik <span style={styles.breadcrumbSep}>/</span> <span style={styles.breadcrumbActive}>Tahun Akademik</span></div>
+            <h1 style={styles.title}>Tahun Akademik</h1>
+            <p style={styles.subtitle}>Kelola periode tahun akademik yang digunakan sistem.</p>
+          </div>
+          <div style={styles.headerIconWrap}>
+            <span style={styles.headerIcon}>📅</span>
+          </div>
+        </div>
+
+        {/* Stat widgets */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FFEEDD', color: '#FF7A00' }}>📅</div>
+            <div>
+              <div style={styles.statNumber}>{totalTahun}</div>
+              <div style={styles.statLabel}>Total Tahun Akademik</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E4F7F0', color: '#12B886' }}>✅</div>
+            <div>
+              <div style={styles.statNumber}>{tahunAktif ? tahunAktif.tahun_akademik || `${tahunAktif.tahun_awal}/${Number(tahunAktif.tahun_awal) + 1}` : '-'}</div>
+              <div style={styles.statLabel}>Tahun Berjalan</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#E7EEFF', color: '#3E5EF0' }}>⬆️</div>
+            <div>
+              <div style={styles.statNumber}>{tahunTerbaru}</div>
+              <div style={styles.statLabel}>Tahun Terbaru</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={{ ...styles.statIcon, background: '#FDE8F1', color: '#E0448A' }}>⬇️</div>
+            <div>
+              <div style={styles.statNumber}>{tahunTerlama}</div>
+              <div style={styles.statLabel}>Tahun Terlama</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          {/* Toolbar */}
+          <div style={styles.toolbar}>
+            <div style={styles.toolbarLeft}>
+              <button style={styles.btnPrimary} onClick={handleAddNew}>
+                ➕ Tambah Tahun Akademik
+              </button>
+              <button
+                style={{
+                  ...styles.btnDanger,
+                  ...(selectedIds.length === 0 ? styles.btnDisabled : {}),
+                }}
+                onClick={handleBulkDelete}
+                disabled={selectedIds.length === 0}
+              >
+                🗑️ Hapus ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+
+          {/* Table Section */}
+          <div style={styles.tableWrapper}>
+            <div style={styles.tableHeader}>
+              <h2 style={styles.tableTitle}>📋 Daftar Tahun Akademik</h2>
+              <span style={styles.badgeCount}>Total: {data.length} tahun</span>
+            </div>
+
+            {loading ? (
+              <div style={styles.loading}>⏳ Memuat data...</div>
+            ) : data.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={styles.emptyIcon}>📭</span>
+                <p style={{ margin: 0, fontWeight: 600, color: '#42506B' }}>Belum ada data tahun akademik</p>
+                <small style={{ color: '#8A96AD' }}>Klik &quot;Tambah Tahun Akademik&quot; untuk menambahkan data</small>
+              </div>
+            ) : (
+              <div style={styles.tableContainer}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHeaderRow}>
+                      <th style={styles.thCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === data.length && data.length > 0}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          style={styles.checkbox}
+                        />
+                      </th>
+                      <th style={styles.th} onClick={() => handleSort('tahun_akademik')}>
+                        Tahun Akademik <SortIndicator column="tahun_akademik" sortConfig={sortConfig} />
+                      </th>
+                      <th style={styles.thAksi}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedData.map((row) => (
+                      <tr key={row.id} className="edumy-row" style={styles.tableRow}>
+                        <td style={styles.tdCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(row.id)}
+                            onChange={(e) => handleSelectRow(row.id, e.target.checked)}
+                            style={styles.checkbox}
+                          />
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeDate}>{row.tahun_akademik}</span>
+                        </td>
+                        <td style={styles.tdAksi}>
+                          <button style={styles.btnIconPrimary} onClick={() => handleEdit(row)} title="Edit">
+                            ✏️
+                          </button>
+                          <button style={styles.btnIconDanger} onClick={() => handleDelete(row.id)} title="Hapus">
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Form Modal */}
-      {showForm && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <div style={styles.formHeader}>
-              <h3 style={styles.formTitle}>{editingId ? 'Edit Tahun Akademik' : 'Tambah Tahun Akademik'}</h3>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                style={styles.closeBtn}
-              >
-                ✕
-              </button>
+      {/* Message Popup */}
+      {message.text && (
+        <div style={styles.modal} onClick={() => setMessage({ type: '', text: '' })}>
+          <div
+            style={{
+              ...styles.modalContentSmall,
+              ...(message.type === 'success' ? styles.popupSuccess : styles.popupError),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={styles.popupIcon}>
+              {message.type === 'success' ? '✅' : '❌'}
             </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Tahun Awal</label>
-              <input
-                type="text"
-                name="tahun_awal"
-                placeholder="Contoh: 2026"
-                value={form.tahun_awal}
-                onChange={handleChange}
-                maxLength="4"
-                style={styles.input}
-              />
-              <small style={styles.hint}>
-                Tahun akhir akan otomatis menjadi tahun awal + 1
-              </small>
-            </div>
-
-            <div style={styles.formActions}>
-              <button onClick={handleSubmit} style={styles.btnSubmit}>
-                {editingId ? 'Update' : 'Simpan'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                style={styles.btnCancel}
-              >
-                Batal
-              </button>
-            </div>
+            <p style={styles.popupText}>{message.text}</p>
+            <button style={styles.btnClose} onClick={() => setMessage({ type: '', text: '' })}>
+              Tutup
+            </button>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div style={styles.tableWrapper}>
-        {loading ? (
-          <p style={styles.loading}>Loading...</p>
-        ) : data.length === 0 ? (
-          <p style={styles.empty}>Tidak ada data tahun akademik</p>
-        ) : (
-          <table style={styles.table}>
-            <thead>
-              <tr style={styles.headerRow}>
-                <th style={styles.checkboxCell}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length === data.length && data.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
-                </th>
-                <th style={styles.cell} onClick={() => handleSort('tahun_akademik')}>
-                  {/* ✅ Fix 3: Pass sortConfig as prop */}
-                  Tahun Akademik <SortIndicator column="tahun_akademik" sortConfig={sortConfig} />
-                </th>
-                <th style={styles.cell}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getSortedData().map((row) => (
-                <tr key={row.id} style={styles.bodyRow}>
-                  <td style={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(row.id)}
-                      onChange={(e) => handleSelectRow(row.id, e.target.checked)}
-                    />
-                  </td>
-                  <td style={styles.cell}>{row.tahun_akademik}</td>
-                  <td style={styles.cell}>
-                    <button onClick={() => handleEdit(row)} style={styles.btnEdit}>
-                      ✏️ Edit
-                    </button>
-                    <button onClick={() => handleDelete(row.id)} style={styles.btnDelete}>
-                      🗑️ Hapus
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Form Modal */}
+      {showForm && (
+        <div
+          style={styles.modal}
+          onClick={() => {
+            setShowForm(false);
+            resetForm();
+          }}
+        >
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeaderBar}>
+              <h3 style={styles.modalTitle}>
+                {editingId ? '✏️ Edit Tahun Akademik' : '➕ Tambah Tahun Akademik'}
+              </h3>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Tahun Awal *</label>
+                <input
+                  type="text"
+                  name="tahun_awal"
+                  placeholder="Contoh: 2026"
+                  value={form.tahun_awal}
+                  onChange={handleChange}
+                  maxLength="4"
+                  style={styles.input}
+                />
+                <small style={styles.hint}>
+                  Tahun akhir akan otomatis menjadi tahun awal + 1
+                </small>
+              </div>
+
+              <div style={styles.modalActions}>
+                <button style={styles.btnPrimary} onClick={handleSubmit}>
+                  💾 {editingId ? 'Update' : 'Simpan'}
+                </button>
+                <button
+                  style={styles.btnSecondary}
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                >
+                  ❌ Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+
+// ── Edumy-inspired design tokens ──────────────────────────────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886
+
 const styles = {
+
+  // ── Page shell ────────────────────────────────────────────
   container: {
+    minHeight: '100vh',
+    background: '#F3F5FA',
     padding: '2rem',
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+
+  pageWrap: {
     maxWidth: '1400px',
     margin: '0 auto',
   },
-  message: {
-    padding: '1rem',
-    marginBottom: '1rem',
-    borderRadius: '8px',
-    textAlign: 'center',
+
+  // ── Header / breadcrumb ─────────────────────────────────────
+  pageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '1.5rem',
+    gap: '1rem',
+    flexWrap: 'wrap',
+  },
+  breadcrumb: {
+    fontSize: '0.8rem',
+    color: '#9AA5BC',
     fontWeight: '500',
-    animation: 'slideIn 0.3s ease-out',
+    marginBottom: '0.5rem',
   },
-  messageError: {
-    backgroundColor: '#fee',
-    color: '#c33',
-    border: '1px solid #fcc',
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
   },
-  messageSuccess: {
-    backgroundColor: '#efe',
-    color: '#3c3',
-    border: '1px solid #cfc',
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
   },
-  header: {
+  title: {
+    fontSize: '1.9rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
+  },
+  subtitle: {
+    fontSize: '0.9rem',
+    color: '#8A96AD',
+    margin: '0.35rem 0 0 0',
+  },
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
+  },
+  headerIcon: {
+    fontSize: '1.6rem',
+  },
+
+  // ── Stat widgets ────────────────────────────────────────────
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '1.1rem',
+    marginBottom: '1.5rem',
+  },
+  statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '1.15rem 1.25rem',
+    boxShadow: '0 4px 18px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+  },
+  statIcon: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.25rem',
+    flexShrink: 0,
+  },
+  statNumber: {
+    fontSize: '1.45rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    fontFamily: "'Poppins', sans-serif",
+    lineHeight: 1.1,
+  },
+  statLabel: {
+    fontSize: '0.8rem',
+    color: '#8A96AD',
+    fontWeight: '500',
+    marginTop: '0.15rem',
+  },
+
+  // ── Main card ────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '1.75rem',
+  },
+
+  // ── Toolbar ────────────────────────────────────────────────
+  toolbar: {
+    marginBottom: '1.5rem',
+    paddingBottom: '1.25rem',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  toolbarLeft: {
+    display: 'flex',
+    gap: '0.7rem',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+
+  // ── Buttons (Edumy pill style) ──────────────────────────────
+  btnPrimary: {
+    padding: '0.6rem 1.35rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.35)',
+    transition: 'opacity 0.2s, transform 0.1s',
+  },
+  btnDanger: {
+    padding: '0.6rem 1.35rem',
+    background: '#FDEBEE',
+    color: '#E5484D',
+    border: '1px solid #F8CDD3',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s, transform 0.1s',
+  },
+  btnDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  btnSecondary: {
+    padding: '0.6rem 1.35rem',
+    background: '#F3F5FA',
+    color: '#5B6A88',
+    border: '1px solid #E4E8F1',
+    borderRadius: '999px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  },
+
+  // ── Table section ──────────────────────────────────────────
+  tableWrapper: {
+    marginTop: '0.25rem',
+  },
+  tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '2rem',
-    paddingBottom: '1rem',
-    borderBottom: '2px solid #e2e8f0',
+    marginBottom: '0.9rem',
+    padding: '0 0.1rem',
   },
-  controls: {
-    display: 'flex',
-    gap: '1rem',
+  tableTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
-  btnPrimary: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#667eea',
-    color: '#000000',
-    border: 'none',
-    borderRadius: '8px',
+  badgeCount: {
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
+    padding: '0.3rem 0.9rem',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    letterSpacing: '0.02em',
+  },
+
+  // ── Empty / loading states ─────────────────────────────────
+  emptyState: {
+    textAlign: 'center',
+    padding: '3.5rem 2rem',
+    backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    color: '#9AA5BC',
+    border: '2px dashed #E4E8F1',
+  },
+  emptyIcon: {
+    fontSize: '3rem',
+    display: 'block',
+    marginBottom: '1rem',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#FF7A00',
     fontSize: '1rem',
     fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
   },
-  btnDanger: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#dc2626',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '1rem',
+
+  // ── Table ──────────────────────────────────────────────────
+  tableContainer: {
+    overflowX: 'auto',
+    borderRadius: '14px',
+    border: '1px solid #EEF1F8',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    backgroundColor: 'white',
+  },
+  tableHeaderRow: {
+    backgroundColor: '#FAFBFF',
+  },
+  th: {
+    padding: '0.85rem 1rem',
+    textAlign: 'left',
+    fontWeight: '700',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    cursor: 'pointer',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  thCheckbox: {
+    padding: '0.85rem 1rem',
+    width: '44px',
+    textAlign: 'center',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  thAksi: {
+    padding: '0.85rem 1rem',
+    width: '110px',
+    textAlign: 'center',
+    color: '#8A96AD',
+    fontSize: '0.72rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    borderBottom: '1px solid #EEF1F8',
+  },
+  td: {
+    padding: '0.85rem 1rem',
+    color: '#42506B',
+    fontSize: '0.875rem',
+    verticalAlign: 'middle',
+  },
+  tdCheckbox: {
+    padding: '0.85rem 1rem',
+    textAlign: 'center',
+    verticalAlign: 'middle',
+  },
+  tdAksi: {
+    padding: '0.85rem 1rem',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    verticalAlign: 'middle',
+  },
+  tableRow: {
+    borderBottom: '1px solid #F3F5FA',
+    transition: 'background-color 0.15s',
+  },
+  checkbox: {
+    cursor: 'pointer',
+    width: '17px',
+    height: '17px',
+    accentColor: '#FF7A00',
+  },
+
+  // ── Data badges (pill style) ────────────────────────────────
+  badgeDate: {
+    backgroundColor: '#F3F5FA',
+    color: '#5B6A88',
+    padding: '0.2rem 0.75rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
     fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    display: 'inline-block',
   },
+
+  // ── Row action icon-buttons ────────────────────────────────
+  btnIconPrimary: {
+    background: '#EDEBFF',
+    border: 'none',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
+    transition: 'background 0.2s',
+    marginRight: '0.4rem',
+    color: '#5B4FE0',
+  },
+  btnIconDanger: {
+    background: '#FDEBEE',
+    border: 'none',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '10px',
+    transition: 'background 0.2s',
+    color: '#E5484D',
+  },
+
+  // ── Modal overlay + content ────────────────────────────────
   modal: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    background: 'rgba(20,24,40,0.5)',
+    backdropFilter: 'blur(3px)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '2rem',
-    maxWidth: '500px',
-    width: '90%',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    background: 'white',
+    borderRadius: '20px',
+    minWidth: '420px',
+    maxWidth: '90vw',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
   },
-  formHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '1.5rem',
+  modalHeaderBar: {
+    padding: '1.25rem 1.75rem',
+    borderBottom: '1px solid #EEF1F8',
+    background: '#FAFBFF',
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px',
   },
-  formTitle: {
-    color: '#000000',
+  modalTitle: {
+    fontSize: '1.15rem',
+    fontWeight: '700',
+    color: '#1E2A45',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
   },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '1.5rem',
-    cursor: 'pointer',
-    color: '#666',
+  modalBody: {
+    padding: '1.75rem',
   },
+  modalActions: {
+    display: 'flex',
+    gap: '0.75rem',
+    justifyContent: 'flex-end',
+    marginTop: '1.5rem',
+    paddingTop: '1.25rem',
+    borderTop: '1px solid #EEF1F8',
+  },
+
+  // ── Form ─────────────────────────────────────────────────
   formGroup: {
-    marginBottom: '1.5rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
   },
   label: {
-    display: 'block',
-    marginBottom: '0.5rem',
     fontWeight: '600',
-    color: '#333',
+    color: '#5B6A88',
+    fontSize: '0.78rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   input: {
-    width: '100%',
-    padding: '0.75rem',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '1rem',
+    padding: '0.7rem 0.9rem',
+    borderRadius: '10px',
+    border: '1.5px solid #E4E8F1',
+    fontSize: '0.9rem',
+    color: '#1E2A45',
     boxSizing: 'border-box',
-    color: '#000000',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    outline: 'none',
+    width: '100%',
   },
   hint: {
     display: 'block',
-    marginTop: '0.5rem',
-    color: '#666',
-    fontSize: '0.875rem',
+    marginTop: '0.3rem',
+    color: '#8A96AD',
+    fontSize: '0.78rem',
   },
-  formActions: {
-    display: 'flex',
-    gap: '1rem',
-    justifyContent: 'flex-end',
+
+  // ── Popup Modal ────────────────────────────────────────────
+  modalContentSmall: {
+    background: 'white',
+    borderRadius: '20px',
+    minWidth: '350px',
+    maxWidth: '85vw',
+    padding: '2rem',
+    boxShadow: '0 24px 64px rgba(20,24,40,0.28)',
+    textAlign: 'center',
   },
-  btnSubmit: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#667eea',
+  popupIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  popupText: {
+    color: '#1E2A45',
+    fontSize: '1rem',
+    fontWeight: '500',
+    marginBottom: '1.5rem',
+    lineHeight: '1.5',
+  },
+  popupSuccess: {
+    backgroundColor: '#F0FBF6',
+    borderLeft: '4px solid #12B886',
+  },
+  popupError: {
+    backgroundColor: '#FDF1F2',
+    borderLeft: '4px solid #E5484D',
+  },
+  btnClose: {
+    padding: '0.6rem 1.6rem',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
-    fontSize: '1rem',
+    borderRadius: '999px',
+    fontSize: '0.9rem',
     fontWeight: '600',
     cursor: 'pointer',
-  },
-  btnCancel: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#e2e8f0',
-    color: '#333',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '1rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  tableWrapper: {
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  headerRow: {
-    backgroundColor: '#f8f9fa',
-    borderBottom: '2px solid #e2e8f0',
-    color: '#000000',
-  },
-  bodyRow: {
-    borderBottom: '1px solid #e2e8f0',
-  },
-  cell: {
-    padding: '1rem',
-    textAlign: 'left',
-    cursor: 'pointer',
-    userSelect: 'none',
-    color: '#000000',
-  },
-  checkboxCell: {
-    padding: '1rem',
-    width: '50px',
-    textAlign: 'center',
-  },
-  btnEdit: {
-    padding: '0.5rem 1rem',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '0.875rem',
-  },
-  btnDelete: {
-    padding: '0.5rem 1rem',
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '0.875rem',
-  },
-  loading: {
-    padding: '2rem',
-    textAlign: 'center',
-    color: '#666',
-  },
-  empty: {
-    padding: '2rem',
-    textAlign: 'center',
-    color: '#999',
+    boxShadow: '0 4px 14px rgba(255,122,0,0.3)',
+    transition: 'opacity 0.2s',
   },
 };
