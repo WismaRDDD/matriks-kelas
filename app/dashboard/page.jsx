@@ -1,90 +1,122 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function DashboardHome() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/auth/session');
-        if (!res.ok) {
-          router.push('/login');
-          return;
-        }
-      } catch {
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router]);
-
-  if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Memuat...</div>;
-  }
-
   const navItems = [
-    { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
-    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
-    { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
-    { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
-    { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
+    {
+      id: 'dosen',
+      icon: '👨‍🏫',
+      label: 'Dosen',
+      href: '/dashboard/dosen',
+      desc: 'Kelola biodata, preferensi jadwal, dan impor data dosen.',
+      iconBg: '#FFEEDD',
+      iconColor: '#FF7A00',
+    },
+    {
+      id: 'kurikulum',
+      icon: '📖',
+      label: 'Kurikulum',
+      href: '/dashboard/kurikulum',
+      desc: 'Susun dan kelola struktur kurikulum program studi.',
+      iconBg: '#E7EEFF',
+      iconColor: '#3E5EF0',
+    },
+    {
+      id: 'ruangan',
+      icon: '🏢',
+      label: 'Ruangan',
+      href: '/dashboard/ruangan',
+      desc: 'Atur data ruang kelas, kapasitas, dan lantai gedung.',
+      iconBg: '#FDE8F1',
+      iconColor: '#E0448A',
+    },
+    {
+      id: 'kelas',
+      icon: '📚',
+      label: 'KRS Matakuliah',
+      href: '/dashboard/kelas',
+      desc: 'Kelola pengambilan mata kuliah dan kelas mahasiswa.',
+      iconBg: '#E4F7F0',
+      iconColor: '#12B886',
+    },
+    {
+      id: 'jadwal',
+      icon: '📅',
+      label: 'Jadwal',
+      href: '/dashboard/jadwal',
+      desc: 'Susun preset dan generate jadwal perkuliahan otomatis.',
+      iconBg: '#EDEBFF',
+      iconColor: '#5B4FE0',
+    },
   ];
+
+  // Add hover styles + font import on client side only (matches DosenPage)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Jost:wght@400;500;600&display=swap');
+
+      * { font-family: 'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+      .edumy-menu-card {
+        transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+      }
+      .edumy-menu-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(30,42,69,0.10);
+        border-color: #FFDBA8;
+      }
+      .edumy-menu-card:active {
+        transform: translateY(-1px);
+      }
+
+      ::-webkit-scrollbar { height: 8px; width: 8px; }
+      ::-webkit-scrollbar-thumb { background: #E4E8F1; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    `;
+    document.head.appendChild(styleSheet);
+  }, []);
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Matriks Kelas</h1>
-      </div>
+      <div style={styles.pageWrap}>
 
-      {/* Navigation */}
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          {navItems.map(item => (
-            <Link key={item.id} href={item.href}>
-              <button
-                style={{
-                  ...styles.navItem,
-                  ...(activeTab === item.id ? styles.navItemActive : {}),
-                }}
-                onClick={() => setActiveTab(item.id)}
-              >
-                {item.label}
-                {activeTab === item.id && <div style={styles.navUnderline}></div>}
-              </button>
-            </Link>
-          ))}
+        {/* Edumy-style breadcrumb / page header */}
+        <div style={styles.pageHeader}>
+          <div>
+            <div style={styles.breadcrumb}>
+              Dashboard <span style={styles.breadcrumbSep}>/</span>{' '}
+              <span style={styles.breadcrumbActive}>Beranda</span>
+            </div>
+            <h1 style={styles.title}>Matriks Kelas</h1>
+            <p style={styles.subtitle}>Selamat datang kembali! Pilih menu di bawah untuk memulai.</p>
+          </div>
+          <div style={styles.headerIconWrap}>
+            <span style={styles.headerIcon}>🎓</span>
+          </div>
         </div>
-      </nav>
 
-      {/* Content */}
-      <div style={styles.content}>
-        <div style={styles.welcomeContainer}>
-          <h2 style={styles.welcomeTitle}>👋 Selamat datang di Matriks Kelas</h2>
-          <p style={styles.welcomeSubtitle}>
-            Silakan pilih menu di atas untuk memulai
-          </p>
-          <div style={styles.welcomeGrid}>
-            {navItems.map(item => (
-              <Link key={item.id} href={item.href}>
-                <div
-                  style={styles.welcomeCard}
-                  onClick={() => setActiveTab(item.id)}
-                >
-                  <div style={styles.welcomeCardIcon}>{item.label.split(' ')[0]}</div>
-                  <h3 style={styles.welcomeCardTitle}>{item.label.split(' ')[1]}</h3>
-                  <p style={styles.welcomeCardDesc}>
-                    Kelola data {item.label.toLowerCase()}
-                  </p>
+        {/* Main card */}
+        <div style={styles.card}>
+          <div style={styles.tableHeader}>
+            <h2 style={styles.tableTitle}>📋 Menu Utama</h2>
+            <span style={styles.badgeCount}>{navItems.length} modul</span>
+          </div>
+
+          <div style={styles.menuGrid}>
+            {navItems.map((item) => (
+              <Link key={item.id} href={item.href} style={styles.linkReset}>
+                <div className="edumy-menu-card" style={styles.menuCard}>
+                  <div style={{ ...styles.menuIconWrap, background: item.iconBg, color: item.iconColor }}>
+                    {item.icon}
+                  </div>
+                  <h3 style={styles.menuCardTitle}>{item.label}</h3>
+                  <p style={styles.menuCardDesc}>{item.desc}</p>
+                  <span style={styles.menuCardArrow}>Buka &rarr;</span>
                 </div>
               </Link>
             ))}
@@ -95,107 +127,165 @@ export default function DashboardHome() {
   );
 }
 
+// ── Edumy-inspired design tokens (shared with DosenPage) ──────
+// Primary: #FF7A00 (Edumy signature orange)
+// Ink/navy: #1E2A45 · Muted text: #8A96AD · Background: #F3F5FA
+// Accents: indigo #3E5EF0, pink #E0448A, teal #12B886, purple #5B4FE0
+
 const styles = {
+
+  // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
-  header: {
+    background: '#F3F5FA',
     padding: '2rem',
-    color: 'white',
+    fontFamily: "'Jost', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+
+  pageWrap: {
+    maxWidth: '1400px',
+    margin: '0 auto',
+  },
+
+  // ── Header / breadcrumb ─────────────────────────────────────
+  pageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '1.5rem',
+    gap: '1rem',
+    flexWrap: 'wrap',
+  },
+  breadcrumb: {
+    fontSize: '0.8rem',
+    color: '#9AA5BC',
+    fontWeight: '500',
+    marginBottom: '0.5rem',
+  },
+  breadcrumbSep: {
+    color: '#C7CEDD',
+    margin: '0 0.25rem',
+  },
+  breadcrumbActive: {
+    color: '#FF7A00',
+    fontWeight: '600',
   },
   title: {
+    fontSize: '1.9rem',
+    fontWeight: '700',
+    color: '#1E2A45',
     margin: 0,
-    fontSize: '2rem',
-    fontWeight: '700',
+    fontFamily: "'Poppins', sans-serif",
+    letterSpacing: '-0.01em',
   },
-  nav: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottom: '2px solid #e2e8f0',
-    padding: '0 2rem',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
+  subtitle: {
+    fontSize: '0.9rem',
+    color: '#8A96AD',
+    margin: '0.35rem 0 0 0',
   },
-  navContent: {
-    display: 'flex',
-    gap: '2rem',
-    maxWidth: '1400px',
-    margin: '0 auto',
-  },
-  navItem: {
-    background: 'none',
-    border: 'none',
-    padding: '1rem 0.5rem',
-    fontSize: '1rem',
-    fontWeight: '500',
-    color: '#4a5568',
-    cursor: 'pointer',
-    transition: 'color 0.2s',
-    position: 'relative',
-    whiteSpace: 'nowrap',
-  },
-  navItemActive: {
-    color: '#667eea',
-    fontWeight: '600',
-  },
-  navUnderline: {
-    position: 'absolute',
-    bottom: '0',
-    left: '0',
-    right: '0',
-    height: '3px',
-    backgroundColor: '#667eea',
-    borderRadius: '3px 3px 0 0',
-  },
-  content: {
-    padding: '3rem 2rem',
-    maxWidth: '1400px',
-    margin: '0 auto',
-  },
-  welcomeContainer: {
-    textAlign: 'center',
-    color: 'white',
-  },
-  welcomeTitle: {
-    fontSize: '2.5rem',
-    fontWeight: '700',
-    marginBottom: '0.5rem',
-    margin: '0 0 0.5rem 0',
-  },
-  welcomeSubtitle: {
-    fontSize: '1.1rem',
-    opacity: 0.9,
-    marginBottom: '3rem',
-    margin: '0 0 3rem 0',
-  },
-  welcomeGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '2rem',
-    marginTop: '2rem',
-  },
-  welcomeCard: {
-    backgroundColor: 'white',
+  headerIconWrap: {
+    width: '56px',
+    height: '56px',
     borderRadius: '16px',
-    padding: '2rem',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-    transition: 'all 0.3s',
-    cursor: 'pointer',
+    background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 20px rgba(255,122,0,0.28)',
   },
-  welcomeCardIcon: {
-    fontSize: '3rem',
-    marginBottom: '1rem',
+  headerIcon: {
+    fontSize: '1.6rem',
   },
-  welcomeCardTitle: {
-    fontSize: '1.3rem',
-    fontWeight: '600',
-    color: '#2d3748',
-    margin: '0 0 0.5rem 0',
+
+  // ── Main card ────────────────────────────────────────────
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '18px',
+    boxShadow: '0 4px 22px rgba(30,42,69,0.06)',
+    border: '1px solid #EEF1F8',
+    padding: '1.75rem',
   },
-  welcomeCardDesc: {
-    fontSize: '0.95rem',
-    color: '#a0aec0',
+
+  tableHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+    padding: '0 0.1rem',
+  },
+  tableTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#1E2A45',
     margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+  },
+  badgeCount: {
+    backgroundColor: '#FFEEDD',
+    color: '#C15A00',
+    padding: '0.3rem 0.9rem',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    letterSpacing: '0.02em',
+  },
+
+  // ── Menu grid ──────────────────────────────────────────────
+  menuGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '1.25rem',
+  },
+
+  linkReset: {
+    textDecoration: 'none',
+    color: 'inherit',
+  },
+
+  menuCard: {
+    backgroundColor: '#FAFBFF',
+    borderRadius: '16px',
+    padding: '1.75rem 1.5rem',
+    border: '1px solid #EEF1F8',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    height: '100%',
+    boxSizing: 'border-box',
+  },
+
+  menuIconWrap: {
+    width: '52px',
+    height: '52px',
+    borderRadius: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.4rem',
+    marginBottom: '0.5rem',
+  },
+
+  menuCardTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#1E2A45',
+    margin: 0,
+    fontFamily: "'Poppins', sans-serif",
+  },
+
+  menuCardDesc: {
+    fontSize: '0.85rem',
+    color: '#8A96AD',
+    margin: 0,
+    lineHeight: '1.5',
+    flexGrow: 1,
+  },
+
+  menuCardArrow: {
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    color: '#FF7A00',
+    marginTop: '0.5rem',
   },
 };
