@@ -1,28 +1,77 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardHome() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/session');
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
+      } catch {
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  if (loading) {
+    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Memuat...</div>;
+  }
 
   const navItems = [
     { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
+    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
     { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
-    { id: 'ruangan', label: '🏢 Ruangan', href: '/dashboard/ruangan' },
-    { id: 'kelas', label: '📚 KRS Matakuliah', href: '/dashboard/kelas' },
+    { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
     { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
   ];
 
   return (
     <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>📊 Matriks Kelas</h1>
+      </div>
+
+      {/* Navigation */}
+      <nav style={styles.nav}>
+        <div style={styles.navContent}>
+          {navItems.map(item => (
+            <Link key={item.id} href={item.href}>
+              <button
+                style={{
+                  ...styles.navItem,
+                  ...(activeTab === item.id ? styles.navItemActive : {}),
+                }}
+                onClick={() => setActiveTab(item.id)}
+              >
+                {item.label}
+                {activeTab === item.id && <div style={styles.navUnderline}></div>}
+              </button>
+            </Link>
+          ))}
+        </div>
+      </nav>
 
       {/* Content */}
       <div style={styles.content}>
         <div style={styles.welcomeContainer}>
           <h2 style={styles.welcomeTitle}>👋 Selamat datang di Matriks Kelas</h2>
           <p style={styles.welcomeSubtitle}>
-            Silakan pilih menu di bawah untuk memulai
+            Silakan pilih menu di atas untuk memulai
           </p>
           <div style={styles.welcomeGrid}>
             {navItems.map(item => (
@@ -47,176 +96,106 @@ export default function DashboardHome() {
 }
 
 const styles = {
-
-  // ── Page shell ────────────────────────────────────────────
   container: {
     minHeight: '100vh',
-    background: '#f4f6fb',
-    fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   },
-
-  // ── Top gradient header banner ────────────────────────────
   header: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    padding: '1.5rem 2rem',
+    padding: '2rem',
     color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
   },
-
   title: {
     margin: 0,
-    fontSize: '1.6rem',
+    fontSize: '2rem',
     fontWeight: '700',
-    letterSpacing: '0.02em',
-    color: '#ffffff',
   },
-
-  // Optional breadcrumb text inside header
-  headerBreadcrumb: {
-    fontSize: '0.82rem',
-    color: 'rgba(255,255,255,0.72)',
-    margin: 0,
-  },
-
-  // ── Sticky nav bar (tab row) ──────────────────────────────
   nav: {
-    backgroundColor: '#ffffff',
-    borderBottom: '2px solid #e8eaf6',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottom: '2px solid #e2e8f0',
     padding: '0 2rem',
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
   },
-
   navContent: {
     display: 'flex',
-    gap: '0.25rem',
+    gap: '2rem',
     maxWidth: '1400px',
     margin: '0 auto',
-    overflowX: 'auto',
   },
-
-  // Inactive tab
   navItem: {
     background: 'none',
     border: 'none',
-    padding: '1rem 1.1rem',
-    fontSize: '0.9rem',
+    padding: '1rem 0.5rem',
+    fontSize: '1rem',
     fontWeight: '500',
-    color: '#607d8b',
+    color: '#4a5568',
     cursor: 'pointer',
     transition: 'color 0.2s',
     position: 'relative',
     whiteSpace: 'nowrap',
-    letterSpacing: '0.01em',
   },
-
-  // Active tab
   navItemActive: {
-    color: '#7b1fa2',
-    fontWeight: '700',
+    color: '#667eea',
+    fontWeight: '600',
   },
-
-  // Active underline indicator
   navUnderline: {
     position: 'absolute',
     bottom: '0',
     left: '0',
     right: '0',
     height: '3px',
-    background: 'linear-gradient(90deg, #c2185b, #7b1fa2)',
+    backgroundColor: '#667eea',
     borderRadius: '3px 3px 0 0',
   },
-
-  // ── Main content area ─────────────────────────────────────
   content: {
-    padding: '2.5rem 2rem',
+    padding: '3rem 2rem',
     maxWidth: '1400px',
     margin: '0 auto',
   },
-
-  // ── Welcome / dashboard section ───────────────────────────
-
-  // Gradient hero area (sits inside content, above the cards)
   welcomeContainer: {
-    background: 'linear-gradient(135deg, #c2185b 0%, #7b1fa2 60%, #4527a0 100%)',
-    borderRadius: '14px',
-    padding: '2.5rem 2rem',
     textAlign: 'center',
     color: 'white',
-    marginBottom: '2.5rem',
-    boxShadow: '0 8px 32px rgba(123,31,162,0.25)',
   },
-
   welcomeTitle: {
-    fontSize: '2rem',
+    fontSize: '2.5rem',
     fontWeight: '700',
+    marginBottom: '0.5rem',
     margin: '0 0 0.5rem 0',
-    letterSpacing: '0.02em',
   },
-
   welcomeSubtitle: {
-    fontSize: '1rem',
-    opacity: 0.88,
-    margin: '0 0 2.5rem 0',
-    fontWeight: '400',
+    fontSize: '1.1rem',
+    opacity: 0.9,
+    marginBottom: '3rem',
+    margin: '0 0 3rem 0',
   },
-
-  // ── Dashboard card grid ───────────────────────────────────
   welcomeGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '1.5rem',
-    marginTop: '0',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: '2rem',
+    marginTop: '2rem',
   },
-
-  // Each feature card — white with coloured left accent
   welcomeCard: {
     backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '1.75rem 1.5rem',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-    transition: 'transform 0.18s, box-shadow 0.18s',
+    borderRadius: '16px',
+    padding: '2rem',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+    transition: 'all 0.3s',
     cursor: 'pointer',
-    borderTop: '4px solid transparent',
-    // Individual cards can override borderTop colour in JSX:
-    // style={{ ...styles.welcomeCard, borderTop: '4px solid #c2185b' }}
   },
-
-  // Hovered state — apply via onMouseEnter/Leave in JSX:
-  // onMouseEnter: e => e.currentTarget.style.transform = 'translateY(-4px)'
-  // onMouseLeave: e => e.currentTarget.style.transform = 'translateY(0)'
-
   welcomeCardIcon: {
-    fontSize: '2.5rem',
+    fontSize: '3rem',
     marginBottom: '1rem',
-    display: 'block',
   },
-
   welcomeCardTitle: {
-    fontSize: '1.1rem',
-    fontWeight: '700',
-    color: '#37474f',
-    margin: '0 0 0.4rem 0',
+    fontSize: '1.3rem',
+    fontWeight: '600',
+    color: '#2d3748',
+    margin: '0 0 0.5rem 0',
   },
-
   welcomeCardDesc: {
-    fontSize: '0.875rem',
-    color: '#90a4ae',
+    fontSize: '0.95rem',
+    color: '#a0aec0',
     margin: 0,
-    lineHeight: '1.5',
   },
-
-  // ── Card accent colours (use as borderTop overrides) ──────
-  // Apply like: style={{ ...styles.welcomeCard, ...styles.accentPink }}
-  accentPink:   { borderTop: '4px solid #c2185b' },
-  accentPurple: { borderTop: '4px solid #7b1fa2' },
-  accentIndigo: { borderTop: '4px solid #4527a0' },
-  accentTeal:   { borderTop: '4px solid #00897b' },
-  accentBlue:   { borderTop: '4px solid #1e88e5' },
-  accentAmber:  { borderTop: '4px solid #f57f17' },
 };
