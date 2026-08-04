@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import DosenPreferenceModal from '@/app/components/DosenPreferenceModal';
+import { getEffectivePreferencePreset, minutesToTime } from '@/lib/dosen-preference';
 
 export default function JadwalPage() {
   const router = useRouter();
@@ -50,8 +52,6 @@ export default function JadwalPage() {
   const [dosenList, setDosenList] = useState([]);
   const [showPreferenceModal, setShowPreferenceModal] = useState(false);
   const [selectedDosenForPref, setSelectedDosenForPref] = useState(null);
-  const [preferences, setPreferences] = useState({});
-  const [floorPreferences, setFloorPreferences] = useState({ 1: true, 2: true, 3: true, 4: true });
   const [databasePresetsList, setDatabasePresetsList] = useState([]);
   const [customPreferenceByDosenId, setCustomPreferenceByDosenId] = useState({});
   const [scheduleSearch, setScheduleSearch] = useState('');
@@ -142,147 +142,9 @@ export default function JadwalPage() {
   }, [checking]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  const handleEditDosenPreference = async (dosen) => {
+  const handleEditDosenPreference = (dosen) => {
     setSelectedDosenForPref(dosen);
-    
-    // Initialize preferences grid
-    const newPreferences = {};
-    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    
-    days.forEach((day, index) => {
-      newPreferences[day] = {};
-      databasePresetsList.forEach((preset) => {
-        const sessions = generateSessions(preset.jam_mulai, preset.jam_selesai, preset.durasi_slot, preset, day);
-        sessions.forEach((session) => {
-          // Default: all checked except Saturday
-          newPreferences[day][session] = index !== 5;
-        });
-      });
-    });
-
-    // Load existing preferences
-    try {
-      const res = await fetch(`/api/dosen/preferences?dosenId=${dosen.id}`);
-      if (res.ok) {
-        const existingPrefs = await res.json();
-        if (existingPrefs.length > 0) {
-          existingPrefs.forEach((pref) => {
-            if (newPreferences[pref.hari]) {
-              newPreferences[pref.hari][pref.sesi] = pref.is_available;
-            }
-          });
-          
-          // Load floor preferences if exists
-          const dosenWithFloors = existingPrefs[0]?.dosen_prefer_lantai;
-          if (dosenWithFloors) {
-            const floorsArray = dosenWithFloors.split(',').map(f => parseInt(f.trim()));
-            setFloorPreferences({ 1: floorsArray.includes(1), 2: floorsArray.includes(2), 3: floorsArray.includes(3), 4: floorsArray.includes(4) });
-          } else {
-            setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
-          }
-        } else {
-          setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
-        }
-      }
-    } catch (err) {
-      console.error('Error loading preferences:', err);
-      setFloorPreferences({ 1: true, 2: true, 3: true, 4: true });
-    }
-
-    setPreferences(newPreferences);
     setShowPreferenceModal(true);
-  };
-
-  const generateSessions = (jamMulai, jamSelesai, durasi, preset, day = 'Senin') => {
-    const sessions = [];
-    if (!jamMulai || !jamSelesai || !durasi) {
-      return sessions;
-    }
-    
-    const durasiNumber = typeof durasi === 'string' ? parseInt(durasi, 10) : durasi;
-    let current = jamBulaiToMinutes(jamMulai);
-    const end = jamBulaiToMinutes(jamSelesai);
-    
-    let breakStart = null;
-    let breakEnd = null;
-    
-    if (preset) {
-      if (day === 'Jumat') {
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_jumat || '11:20');
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_jumat || '13:30');
-      } else if (day === 'Sabtu') {
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_sabtu || '12:10');
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_sabtu || '13:00');
-      } else {
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_senin_kamis || '12:10');
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_senin_kamis || '13:00');
-      }
-    }
-    
-    while (current < end) {
-      const sessionStart = current;
-      const sessionEnd = current + durasiNumber;
-      
-      if (breakStart !== null && breakEnd !== null) {
-        if (sessionEnd > breakStart && sessionStart < breakEnd) {
-          current = breakEnd;
-          continue;
-        }
-      }
-      
-      const start = minutesToTime(sessionStart);
-      const finish = minutesToTime(sessionEnd);
-      sessions.push(`${start}-${finish}`);
-      current = sessionEnd;
-    }
-    return sessions;
-  };
-
-  const jamBulaiToMinutes = (time) => {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const minutesToTime = (minutes) => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  };
-
-  const handleSaveDosenPreference = async () => {
-    try {
-      const preferredFloors = Object.keys(floorPreferences)
-        .filter(floor => floorPreferences[floor])
-        .join(',');
-      
-      const res = await fetch('/api/dosen/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dosenId: selectedDosenForPref.id,
-          preferences,
-          preferredFloors: preferredFloors || '1,2,3,4',
-        }),
-      });
-
-      if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error || 'Gagal menyimpan preferensi');
-      }
-
-      showMessage('success', `✅ Preferensi ${selectedDosenForPref.f_namapegawai} berhasil disimpan`);
-      if (selectedDosenForPref?.id) {
-        const profile = await getDosenPreferenceProfile(selectedDosenForPref.id);
-        setCustomPreferenceByDosenId((prev) => ({
-          ...prev,
-          [selectedDosenForPref.id]: Boolean(profile.isCustom),
-        }));
-      }
-      setShowPreferenceModal(false);
-    } catch (err) {
-      console.error('Error saving preferences:', err);
-      showMessage('error', `❌ ${err.message}`);
-    }
   };
 
   const fetchTahunAkademik = async () => {
@@ -855,6 +717,19 @@ export default function JadwalPage() {
     popupBtn: { padding: '0.6rem 1.6rem', background: 'linear-gradient(135deg, #FF9A3C, #FF7A00)', color: 'white', border: 'none', borderRadius: '999px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,122,0,0.3)', transition: 'opacity 0.2s' },
   };
 
+  const effectivePreferencePreset = getEffectivePreferencePreset({
+    databasePresets: databasePresetsList,
+    localPreset: settings,
+    localPresetName: selectedPresetOption || activePreset || 'Default',
+  });
+
+  const handlePreferenceSaved = ({ dosenId, isCustom }) => {
+    setCustomPreferenceByDosenId((prev) => ({
+      ...prev,
+      [dosenId]: Boolean(isCustom),
+    }));
+  };
+
   if (checking) return (
     <div style={s.page}>
       <div style={s.titleBar}>
@@ -1303,154 +1178,14 @@ export default function JadwalPage() {
       )}
 
       {/* ── Preferensi Dosen Modal ── */}
-      {showPreferenceModal && selectedDosenForPref && (
-        <div style={s.overlay} onClick={() => setShowPreferenceModal(false)}>
-          <div style={{ ...s.modalBox, maxWidth: '900px', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>📅 Preferensi {selectedDosenForPref.f_namapegawai}</h2>
-              <button style={s.btnClose} onClick={() => setShowPreferenceModal(false)}>✕</button>
-            </div>
-            <div style={s.modalBody}>
-              {databasePresetsList.length > 0 && databasePresetsList[0]?.jam_mulai ? (
-                <>
-                  <div style={s.presetInfoBox}>
-                    <strong>📋 Preset Aktif:</strong> {databasePresetsList[0].nama_preset || 'Default'}
-                    <br />
-                    <small>
-                      ({databasePresetsList[0].jam_mulai} - {databasePresetsList[0].jam_selesai}, Durasi: {databasePresetsList[0].durasi_slot} menit)
-                    </small>
-                  </div>
-
-                  {/* Floor Preferences Section */}
-                  <div style={{ ...s.presetInfoBox, marginTop: '1rem' }}>
-                    <strong>🏢 Preferensi Lantai:</strong>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                      {[1, 2, 3, 4].map((floor) => (
-                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#42506B', fontWeight: '500' }}>
-                          <input
-                            type="checkbox"
-                            checked={floorPreferences[floor] || false}
-                            onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#FF7A00' }}
-                          />
-                          Lantai {floor}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: '1.5rem', overflowX: 'auto', borderRadius: '14px', border: '1px solid #EEF1F8' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', marginBottom: '1rem' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#FAFBFF' }}>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', color: '#5B6A88', fontWeight: 700, fontSize: '0.75rem', minWidth: '80px', border: '1px solid #EEF1F8' }}>
-                            <input
-                              type="checkbox"
-                              checked={(() => {
-                                const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                                let total = 0, checked = 0;
-                                days.forEach((day) => {
-                                  Object.keys(preferences[day] || {}).forEach((session) => {
-                                    total++;
-                                    if (preferences[day][session]) checked++;
-                                  });
-                                });
-                                return total > 0 && checked === total;
-                              })()}
-                              onChange={() => {
-                                setPreferences((prev) => {
-                                  const updated = { ...prev };
-                                  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                                  let total = 0, checked = 0;
-                                  days.forEach((day) => {
-                                    Object.keys(updated[day] || {}).forEach((session) => {
-                                      total++;
-                                      if (updated[day][session]) checked++;
-                                    });
-                                  });
-                                  const allChecked = total > 0 && checked === total;
-                                  const newValue = !allChecked;
-                                  days.forEach((day) => {
-                                    Object.keys(updated[day] || {}).forEach((session) => {
-                                      updated[day][session] = newValue;
-                                    });
-                                  });
-                                  return updated;
-                                });
-                              }}
-                              style={{ accentColor: '#FF7A00', cursor: 'pointer' }}
-                              title="Pilih Semua"
-                            />
-                          </th>
-                          {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
-                            <th key={day} style={{ padding: '0.75rem', textAlign: 'center', color: '#5B6A88', fontWeight: 700, fontSize: '0.75rem', minWidth: '100px', border: '1px solid #EEF1F8' }}>
-                              {day}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.keys(preferences['Senin'] || {}).map((session) => (
-                          <tr key={session} style={{ borderBottom: '1px solid #F3F5FA' }}>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem', color: '#C15A00', backgroundColor: '#FFF6EC', border: '1px solid #EEF1F8', minWidth: '80px' }}>
-                              {session}
-                            </td>
-                            {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
-                              <td key={`${day}-${session}`} style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F3F5FA', backgroundColor: preferences[day]?.[session] ? '#E4F7F0' : 'white' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={preferences[day]?.[session] || false}
-                                  onChange={(e) => {
-                                    setPreferences({
-                                      ...preferences,
-                                      [day]: {
-                                        ...preferences[day],
-                                        [session]: e.target.checked
-                                      }
-                                    });
-                                  }}
-                                  style={{ accentColor: '#FF7A00', cursor: 'pointer', width: '18px', height: '18px' }}
-                                  title={`${day} jam ${session}`}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div style={s.presetInfoBox}>
-                    <small>✅ = Tersedia | ☐ = Tidak tersedia | Default: Semua hari tersedia kecuali Sabtu</small>
-                  </div>
-                </>
-              ) : (
-                <div style={s.errRed}>
-                  <strong>⚠️ Belum ada preset jadwal</strong>
-                  <br />
-                  <small>Silakan buat preset jadwal terlebih dahulu</small>
-                </div>
-              )}
-
-              <div style={s.modalFooter}>
-                <button
-                  onClick={() => setShowPreferenceModal(false)}
-                  style={s.btnGray}
-                >
-                  ❌ Batal
-                </button>
-                <button
-                  onClick={handleSaveDosenPreference}
-                  disabled={databasePresetsList.length === 0}
-                  style={databasePresetsList.length === 0 ? s.btnGrayDisabled : s.btnPrimary}
-                >
-                  💾 Simpan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DosenPreferenceModal
+        open={showPreferenceModal}
+        dosen={selectedDosenForPref}
+        preset={effectivePreferencePreset}
+        onClose={() => setShowPreferenceModal(false)}
+        onSaved={handlePreferenceSaved}
+        onShowMessage={showMessage}
+      />
     </div>
   );
 }

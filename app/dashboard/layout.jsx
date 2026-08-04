@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import AuthRedirectOnUnauthorized from '@/app/components/AuthRedirectOnUnauthorized';
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
@@ -67,6 +68,7 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div style={styles.wrapper}>
+      <AuthRedirectOnUnauthorized />
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerContent}>

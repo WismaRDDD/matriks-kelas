@@ -728,7 +728,7 @@ export default function KurikulumPage() {
                 <label style={styles.label}>Kode Kurikulum *</label>
                 <input
                   style={styles.input}
-                  placeholder="Contoh: KUR2024"
+                  placeholder="Contoh: S1IF"
                   value={form.kode_kurikulum}
                   onChange={(e) =>
                     setForm({ ...form, kode_kurikulum: e.target.value.replace(/\s/g, '') })
@@ -740,7 +740,7 @@ export default function KurikulumPage() {
                 <label style={styles.label}>Nama Kurikulum *</label>
                 <input
                   style={styles.input}
-                  placeholder="Nama kurikulum"
+                  placeholder="Contoh: S1 Informatika"
                   value={form.nama_kurikulum}
                   onChange={(e) => setForm({ ...form, nama_kurikulum: e.target.value })}
                 />

@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import DosenPreferenceModal from '@/app/components/DosenPreferenceModal';
+import { DEFAULT_LOCAL_PREFERENCE_PRESET, getEffectivePreferencePreset } from '@/lib/dosen-preference';
 
 export default function DosenPage() {
+  const router = useRouter();
   const [data, setData] = useState([]);
   const [file, setFile] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -18,8 +22,7 @@ export default function DosenPage() {
 
   const [showPreferenceForm, setShowPreferenceForm] = useState(false);
   const [presets, setPresets] = useState([]);
-  const [preferences, setPreferences] = useState({});
-  const [floorPreferences, setFloorPreferences] = useState({ 1: true, 2: true, 3: true, 4: true });
+  const [selectedDosenForPreference, setSelectedDosenForPreference] = useState(null);
 
   const [form, setForm] = useState({
     id: '',
@@ -35,8 +38,10 @@ export default function DosenPage() {
   });
 
   const [selectedIds, setSelectedIds] = useState([]);
-  const defaultDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  const defaultFloorPreference = { 1: true, 2: true, 3: true, 4: true };
+
+  const redirectToLogin = (loginUrl) => {
+    router.push(loginUrl === '/login' ? loginUrl : '/login');
+  };
 
   // Fetch Data
   const fetchData = async () => {
@@ -47,6 +52,11 @@ export default function DosenPage() {
       const payload = contentType.includes('application/json') ? await res.json() : null;
 
       if (!res.ok) {
+        if (res.status === 401) {
+          redirectToLogin(payload?.loginUrl);
+          return;
+        }
+
         const apiError = payload?.error || `HTTP ${res.status}`;
         throw new Error(apiError);
       }
@@ -74,6 +84,13 @@ export default function DosenPage() {
   const fetchPresets = async () => {
     try {
       const res = await fetch('/api/jadwal/presets');
+      if (res.status === 401) {
+        const contentType = res.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json') ? await res.json() : null;
+        redirectToLogin(payload?.loginUrl);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(`Failed to fetch presets: ${res.status}`);
       }
@@ -210,240 +227,9 @@ export default function DosenPage() {
     setShowForm(true);
   };
 
-  const buildDefaultPreferences = () => {
-    const newPreferences = {};
-
-    defaultDays.forEach((day, index) => {
-      newPreferences[day] = {};
-
-      const activePreset = presets[0];
-      if (!activePreset?.jam_mulai || !activePreset?.jam_selesai || !activePreset?.durasi_slot) {
-        return;
-      }
-
-      const sessions = generateSessions(
-        activePreset.jam_mulai,
-        activePreset.jam_selesai,
-        activePreset.durasi_slot,
-        activePreset,
-        day,
-      );
-
-      sessions.forEach((session) => {
-        newPreferences[day][session] = index !== 5;
-      });
-    });
-
-    return newPreferences;
-  };
-
-  const isDefaultPreferenceState = () => {
-    const defaultPreferences = buildDefaultPreferences();
-    const hasSameSessions = defaultDays.every((day) =>
-      Object.keys(defaultPreferences[day] || {}).every((session) => preferences[day]?.[session] === defaultPreferences[day][session])
-    );
-
-    const hasSameFloors = Object.keys(defaultFloorPreference).every((floor) => floorPreferences[floor] === defaultFloorPreference[floor]);
-
-    return hasSameSessions && hasSameFloors;
-  };
-
-  const handleResetPreferences = () => {
-    const resetPreferences = buildDefaultPreferences();
-    setPreferences(resetPreferences);
-    setFloorPreferences({ ...defaultFloorPreference });
-    showMessage('success', 'Preferensi berhasil dikembalikan ke default');
-  };
-
-  const handleEditPreference = async (data) => {
-    setForm({ id: data.id, f_namapegawai: data.f_namapegawai });
-
-    const newPreferences = buildDefaultPreferences();
-
-    // Load existing preferences
-    try {
-      const res = await fetch(`/api/dosen/preferences?dosenId=${data.id}`);
-      if (res.ok) {
-        const existingPrefs = await res.json();
-        if (existingPrefs.length > 0) {
-          existingPrefs.forEach((pref) => {
-            if (newPreferences[pref.hari]) {
-              newPreferences[pref.hari][pref.sesi] = pref.is_available;
-            }
-          });
-
-          // Load floor preferences if exists
-          const dosenWithFloors = existingPrefs[0]?.dosen_prefer_lantai;
-          if (dosenWithFloors) {
-            const floorsArray = dosenWithFloors.split(',').map(f => parseInt(f.trim()));
-            setFloorPreferences({ 1: floorsArray.includes(1), 2: floorsArray.includes(2), 3: floorsArray.includes(3), 4: floorsArray.includes(4) });
-          } else {
-            setFloorPreferences({ ...defaultFloorPreference });
-          }
-        } else {
-          setFloorPreferences({ ...defaultFloorPreference });
-        }
-      }
-    } catch (err) {
-      console.error('Error loading preferences:', err);
-      setFloorPreferences({ ...defaultFloorPreference });
-    }
-
-    setPreferences(newPreferences);
+  const handleEditPreference = (data) => {
+    setSelectedDosenForPreference({ id: data.id, f_namapegawai: data.f_namapegawai });
     setShowPreferenceForm(true);
-  };
-
-  const handleSelectAllSessionsForDay = (day, sessions) => {
-    setPreferences((prev) => {
-      const updated = { ...prev };
-      if (!updated[day]) updated[day] = {};
-
-      // Check if ALL sessions for this day are checked
-      const allSessionsChecked = sessions.length > 0 && sessions.every((session) => updated[day]?.[session]);
-
-      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
-      const newValue = allSessionsChecked ? false : true;
-      sessions.forEach((session) => {
-        updated[day][session] = newValue;
-      });
-      return updated;
-    });
-  };
-
-  const handleSelectAllDaysForSession = (session, days) => {
-    setPreferences((prev) => {
-      const updated = { ...prev };
-
-      // Check if ALL days for this session are checked
-      const allDaysChecked = days.every((day) => updated[day]?.[session]);
-
-      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
-      const newValue = allDaysChecked ? false : true;
-      days.forEach((day) => {
-        if (!updated[day]) updated[day] = {};
-        updated[day][session] = newValue;
-      });
-      return updated;
-    });
-  };
-
-  const handleSelectAllPreferences = () => {
-    setPreferences((prev) => {
-      const updated = { ...prev };
-      const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
-      // Count total and checked items
-      let totalItems = 0;
-      let checkedItems = 0;
-      days.forEach((day) => {
-        Object.keys(updated[day] || {}).forEach((session) => {
-          totalItems++;
-          if (updated[day][session]) checkedItems++;
-        });
-      });
-
-      // Explicit logic: uncheck ONLY if all are checked, otherwise check all
-      const allChecked = totalItems > 0 && checkedItems === totalItems;
-      const newValue = allChecked ? false : true;
-      days.forEach((day) => {
-        if (!updated[day]) updated[day] = {};
-        // Get all sessions for this day
-        const sessions = Object.keys(updated[day]);
-        sessions.forEach((session) => {
-          updated[day][session] = newValue;
-        });
-      });
-      return updated;
-    });
-  };
-
-  const generateSessions = (jamMulai, jamSelesai, durasi, preset, day = 'Senin') => {
-    const sessions = [];
-    if (!jamMulai || !jamSelesai || !durasi) {
-      return sessions;
-    }
-
-    const durasiNumber = typeof durasi === 'string' ? parseInt(durasi, 10) : durasi;
-    let current = jamBulaiToMinutes(jamMulai);
-    const end = jamBulaiToMinutes(jamSelesai);
-
-    // Get break times based on day
-    let breakStart = null;
-    let breakEnd = null;
-
-    if (preset) {
-      if (day === 'Jumat') {
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_jumat);
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_jumat);
-      } else if (day === 'Sabtu') {
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_sabtu);
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_sabtu);
-      } else {
-        // Senin - Kamis
-        breakStart = jamBulaiToMinutes(preset.jam_istirahat_mulai_senin_kamis);
-        breakEnd = jamBulaiToMinutes(preset.jam_istirahat_selesai_senin_kamis);
-      }
-    }
-
-    while (current < end) {
-      const sessionStart = current;
-      const sessionEnd = current + durasiNumber;
-
-      // Skip this session if it overlaps with break time
-      if (breakStart !== null && breakEnd !== null) {
-        if (sessionEnd > breakStart && sessionStart < breakEnd) {
-          // Session overlaps with break, skip to after break
-          current = breakEnd;
-          continue;
-        }
-      }
-
-      const start = minutesToTime(sessionStart);
-      const finish = minutesToTime(sessionEnd);
-      sessions.push(`${start}-${finish}`);
-      current = sessionEnd;
-    }
-    return sessions;
-  };
-
-  const jamBulaiToMinutes = (time) => {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const minutesToTime = (minutes) => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  };
-
-  const handleSavePreference = async () => {
-    try {
-      const preferredFloors = Object.keys(floorPreferences)
-        .filter(floor => floorPreferences[floor])
-        .join(',');
-
-      const res = await fetch('/api/dosen/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dosenId: form.id,
-          preferences,
-          preferredFloors: preferredFloors || '1,2,3,4',
-        }),
-      });
-
-      if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error || 'Gagal menyimpan preferensi');
-      }
-
-      showMessage('success', '✅ Preferensi dosen berhasil disimpan');
-      setShowPreferenceForm(false);
-    } catch (err) {
-      console.error('Error saving preferences:', err);
-      showMessage('error', `❌ ${err.message}`);
-    }
   };
 
   // Import Handlers
@@ -637,6 +423,11 @@ export default function DosenPage() {
   const totalLaki = data.filter((d) => d.f_jeniskelamin === 'L').length;
   const totalPerempuan = data.filter((d) => d.f_jeniskelamin === 'P').length;
   const totalProdi = new Set(data.map((d) => d.f_progdi_id).filter(Boolean)).size;
+  const effectivePreferencePreset = getEffectivePreferencePreset({
+    databasePresets: presets,
+    localPreset: DEFAULT_LOCAL_PREFERENCE_PRESET,
+    localPresetName: 'Normal',
+  });
 
   // Add hover styles + font import on client side only
   useEffect(() => {
@@ -1056,157 +847,14 @@ export default function DosenPage() {
         </div>
       )}
 
-      {/* Modal Preferensi Dosen */}
-      {showPreferenceForm && (
-        <div style={styles.modal} onClick={() => setShowPreferenceForm(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeaderBar}>
-              <div style={styles.modalTitleRow}>
-                <h3 style={styles.modalTitle}>📅 Preferensi Dosen - {form.f_namapegawai}</h3>
-                <span style={isDefaultPreferenceState() ? styles.statusBadgeDefault : styles.statusBadgeCustom}>
-                  {isDefaultPreferenceState() ? 'Default' : 'Custom'}
-                </span>
-              </div>
-            </div>
-
-            <div style={styles.modalBody}>
-              {presets.length > 0 && presets[0]?.jam_mulai ? (
-                <>
-                  <div style={styles.presetInfo}>
-                    <strong>📋 Preset:</strong> {presets[0].nama_preset || 'Default'}
-                    <span style={styles.presetDetails}>
-                      ({presets[0].jam_mulai} - {presets[0].jam_selesai}, Durasi: {presets[0].durasi_slot} menit)
-                    </span>
-                  </div>
-
-                  {/* Floor Preferences Section */}
-                  <div style={{ ...styles.presetInfo, marginTop: '1rem' }}>
-                    <strong>🏢 Preferensi Lantai:</strong>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                      {[1, 2, 3, 4].map((floor) => (
-                        <label key={floor} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#42506B', fontWeight: '500' }}>
-                          <input
-                            type="checkbox"
-                            checked={floorPreferences[floor] || false}
-                            onChange={(e) => setFloorPreferences({ ...floorPreferences, [floor]: e.target.checked })}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#FF7A00' }}
-                          />
-                          Lantai {floor}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={styles.preferenceGrid}>
-                    <table style={styles.preferenceTable}>
-                      <thead>
-                        <tr>
-                          <th style={styles.preferenceHeaderCell}>
-                            <input
-                              type="checkbox"
-                              checked={(() => {
-                                const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                                return days.every((day) =>
-                                  Object.keys(preferences[day] || {}).every((session) => preferences[day][session])
-                                );
-                              })()}
-                              onChange={handleSelectAllPreferences}
-                              style={styles.checkbox}
-                              title="Pilih semua"
-                            />
-                          </th>
-                          <th style={styles.preferenceHeaderCell}>Hari</th>
-                          {(() => {
-                            const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], 'Senin');
-                            return sessions.map((session) => (
-                              <th key={session} style={styles.preferenceHeaderCell}>
-                                <div style={styles.sessionHeaderDiv}>
-                                  <span>{session}</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={(() => {
-                                      const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                                      const dayCount = days.length;
-                                      const checkedCount = days.filter((day) => preferences[day]?.[session]).length;
-                                      return dayCount > 0 && checkedCount === dayCount;
-                                    })()}
-                                    onChange={() => handleSelectAllDaysForSession(session, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'])}
-                                    style={styles.checkboxSmall}
-                                    title={`Pilih semua hari untuk ${session}`}
-                                  />
-                                </div>
-                              </th>
-                            ));
-                          })()}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
-                          const sessions = generateSessions(presets[0].jam_mulai, presets[0].jam_selesai, presets[0].durasi_slot, presets[0], day);
-                          const allSessionsChecked = sessions.length > 0 && sessions.every((session) => preferences[day]?.[session]);
-                          return (
-                            <tr key={day}>
-                              <td style={styles.preferenceCell}>
-                                <input
-                                  type="checkbox"
-                                  checked={allSessionsChecked}
-                                  onChange={() => handleSelectAllSessionsForDay(day, sessions)}
-                                  style={styles.checkbox}
-                                  title={`Pilih semua sesi untuk ${day}`}
-                                />
-                              </td>
-                              <td style={styles.preferenceRowHeader}>{day}</td>
-                              {sessions.map((session) => (
-                                <td key={session} style={styles.preferenceCell}>
-                                  <input
-                                    type="checkbox"
-                                    checked={preferences[day]?.[session] || false}
-                                    onChange={(e) => {
-                                      setPreferences({
-                                        ...preferences,
-                                        [day]: {
-                                          ...preferences[day],
-                                          [session]: e.target.checked
-                                        }
-                                      });
-                                    }}
-                                    style={styles.checkbox}
-                                    title={`${day} jam ${session}`}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div style={styles.presetLegend}>
-                    <small>✅ = Tersedia | ❌ = Tidak tersedia | Default: Semua hari tersedia kecuali Sabtu</small>
-                  </div>
-                </>
-              ) : (
-                <div style={styles.emptyState}>
-                  <p>⚠️ Belum ada preset jadwal. Silakan buat preset terlebih dahulu di menu Jadwal.</p>
-                </div>
-              )}
-
-              <div style={styles.modalActions}>
-                <button style={styles.btnSecondary} onClick={handleResetPreferences}>
-                  ↺ Reset ke Default
-                </button>
-                <button style={styles.btnPrimary} onClick={handleSavePreference} disabled={presets.length === 0}>
-                  💾 Simpan
-                </button>
-                <button style={styles.btnSecondary} onClick={() => setShowPreferenceForm(false)}>
-                  ❌ Batal
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DosenPreferenceModal
+        open={showPreferenceForm}
+        dosen={selectedDosenForPreference}
+        preset={effectivePreferencePreset}
+        onClose={() => setShowPreferenceForm(false)}
+        onShowMessage={showMessage}
+        emptyStateMessage="Belum ada preset jadwal. Silakan buat preset terlebih dahulu di menu Jadwal."
+      />
     </div>
   );
 }
