@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import AuthRedirectOnUnauthorized from '@/app/components/AuthRedirectOnUnauthorized';
 
-export default function DosenLayout({ children }) {
+export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -20,12 +20,8 @@ export default function DosenLayout({ children }) {
           return;
         }
         const data = await res.json();
-        if (data.session.role !== 'dosen') {
-          router.push('/login');
-          return;
-        }
         setSession(data.session);
-      } catch (err) {
+      } catch {
         router.push('/login');
       } finally {
         setLoading(false);
@@ -48,17 +44,28 @@ export default function DosenLayout({ children }) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Memuat...</div>;
   }
 
+  // Compute activeTab langsung dari pathname tanpa setState
   const getActiveTab = () => {
+    if (pathname.includes('/presensi')) return 'presensi';
+    if (pathname.includes('/tahun-ajaran')) return 'tahun-ajaran';
+    if (pathname.includes('/dosen')) return 'dosen';
+    if (pathname.includes('/ruangan')) return 'ruangan';
+    if (pathname.includes('/kelas')) return 'kelas';
+    if (pathname.includes('/kurikulum')) return 'kurikulum';
     if (pathname.includes('/jadwal')) return 'jadwal';
-    if (pathname.includes('/profile')) return 'profile';
-    return 'profile'; // Default
+    return '';
   };
 
   const activeTab = getActiveTab();
 
   const navItems = [
-    { id: 'profile', label: '👤 Profil', href: '/dosen/dashboard/profile' },
-    { id: 'jadwal', label: '📅 Jadwal Kuliah', href: '/dosen/dashboard/jadwal' },
+    { id: 'presensi', label: '✅ Presensi', href: '/dashboard/admin/presensi' },
+    { id: 'tahun-ajaran', label: '📅 Setup', href: '/dashboard/admin/tahun-ajaran' },
+    { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/admin/dosen' },
+    { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/admin/kurikulum' },
+    { id: 'ruangan', label: '🏢 Ruangan', href: '/dashboard/admin/ruangan' },
+    { id: 'kelas', label: '📚 KRS Matakuliah', href: '/dashboard/admin/kelas' },
+    { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/admin/jadwal' },
   ];
 
   return (
@@ -67,10 +74,12 @@ export default function DosenLayout({ children }) {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerContent}>
-          <h1 style={styles.title}>📊 Matriks Kelas - Dosen</h1>
+          <Link href="/dashboard/admin" style={{ textDecoration: 'none' }}>
+            <h1 style={styles.title}>📊 Matriks Kelas</h1>
+          </Link>
           {session && (
             <div style={styles.userInfo}>
-              <span style={styles.userName}>👤 {session.nama || 'Dosen'}</span>
+              <span style={styles.userName}>👤 {session.username || session.nama || 'User'}</span>
               <button onClick={handleLogout} style={styles.logoutButton}>
                 Logout
               </button>

@@ -20,18 +20,18 @@ export default function DashboardLayout({ children }) {
   const activeTab = getActiveTab();
 
   const navItems = [
-    { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/dosen' },
-    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/ruangan' },
-    { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/kurikulum' },
-    { id: 'kelas', label: '📚 Kelas', href: '/dashboard/kelas' },
-    { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/jadwal' },
+    { id: 'dosen', label: '👨‍🏫 Dosen', href: '/dashboard/admin/dosen' },
+    { id: 'ruangan', label: '🏛️ Ruangan', href: '/dashboard/admin/ruangan' },
+    { id: 'kurikulum', label: '📖 Kurikulum', href: '/dashboard/admin/kurikulum' },
+    { id: 'kelas', label: '📚 Kelas', href: '/dashboard/admin/kelas' },
+    { id: 'jadwal', label: '📅 Jadwal', href: '/dashboard/admin/jadwal' },
   ];
 
   return (
     <div style={styles.wrapper}>
       {/* Header */}
       <div style={styles.header}>
-        <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+        <Link href="/dashboard/admin" style={{ textDecoration: 'none' }}>
           <h1 style={styles.title}>📊 Matriks Kelas</h1>
         </Link>
       </div>

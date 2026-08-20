@@ -33,8 +33,8 @@ export async function GET(req) {
         'kurikulum.f_sks_kurikulum as matkul_sks',
         'kurikulum_master.kode_kurikulum',
         'kurikulum_master.nama_kurikulum',
-        'kurikulum_master.tahun_ajaran',
-        'kurikulum_master.f_tahun_akademik',
+        'kurikulum_master.tahun_kurikulum',
+        'kurikulum_master.f_tahun_ajaran',
         'dosen.f_namapegawai',
         'dosen.f_title_depan',
         'dosen.f_title_belakang'

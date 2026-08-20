@@ -33,11 +33,23 @@ export async function POST(req) {
 }
 
 // PUT
-export async function PUT(req, { params }) {
-  const { id } = params;
+export async function PUT(req) {
+  const { searchParams } = new URL(req.url);
   const body = await req.json();
+  const id = searchParams.get('id') || body.id;
 
-  await knex('kurikulum').where({ id }).update(body);
+  if (!id) {
+    return NextResponse.json({ error: 'ID mata kuliah diperlukan' }, { status: 400 });
+  }
+
+  const updates = { ...body };
+  delete updates.id;
+  delete updates.f_kurikulum;
+  const updated = await knex('kurikulum').where({ id }).update(updates);
+
+  if (!updated) {
+    return NextResponse.json({ error: 'Mata kuliah tidak ditemukan' }, { status: 404 });
+  }
 
   return NextResponse.json({ success: true });
 }

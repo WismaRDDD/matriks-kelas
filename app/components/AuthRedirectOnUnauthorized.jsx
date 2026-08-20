@@ -39,10 +39,6 @@ function isProtectedApiRequest(requestPath) {
   }
 }
 
-function isSafeLoginPath(loginUrl) {
-  return loginUrl === '/login';
-}
-
 export default function AuthRedirectOnUnauthorized() {
   const router = useRouter();
 
@@ -61,24 +57,9 @@ export default function AuthRedirectOnUnauthorized() {
         return response;
       }
 
-      let loginUrl = '';
-
-      try {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const payload = await response.clone().json();
-          loginUrl = payload?.loginUrl || '';
-        }
-      } catch {
-        loginUrl = '';
-      }
-
-      const fallbackLoginUrl = '/login';
-      const redirectTarget = isSafeLoginPath(loginUrl) ? loginUrl : fallbackLoginUrl;
-
       if (!window[AUTH_REDIRECT_FLAG]) {
         window[AUTH_REDIRECT_FLAG] = true;
-        router.replace(redirectTarget);
+        router.replace('/login');
       }
 
       return response;

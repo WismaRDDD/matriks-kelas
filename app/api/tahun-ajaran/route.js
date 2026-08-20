@@ -1,16 +1,16 @@
 import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
-// GET: ambil semua tahun akademik
+// GET: ambil semua tahun ajaran
 export async function GET() {
   try {
-    const data = await knex('tahun_akademik')
+    const data = await knex('tahun_ajaran')
       .select('*')
       .orderBy('tahun_awal', 'desc');
 
     return NextResponse.json(data);
   } catch (err) {
-    console.error('❌ GET tahun_akademik error:', err);
+    console.error('❌ GET tahun_ajaran error:', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
@@ -18,7 +18,7 @@ export async function GET() {
   }
 }
 
-// POST: tambah tahun akademik
+// POST: tambah tahun ajaran
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -39,34 +39,34 @@ export async function POST(req) {
 
     const tahun_awal = parseInt(body.tahun_awal);
     const tahun_akhir = tahun_awal + 1;
-    const tahun_akademik = `${tahun_awal}/${tahun_akhir}`;
+    const tahun_ajaran = `${tahun_awal}/${tahun_akhir}`;
 
     // Cek duplikat
-    const exists = await knex('tahun_akademik')
-      .where({ tahun_akademik })
+    const exists = await knex('tahun_ajaran')
+      .where({ tahun_ajaran })
       .first();
 
     if (exists) {
       return NextResponse.json(
-        { error: 'Tahun akademik sudah ada' },
+        { error: 'Tahun ajaran sudah ada' },
         { status: 400 }
       );
     }
 
-    const result = await knex('tahun_akademik').insert({
+    const result = await knex('tahun_ajaran').insert({
       tahun_awal,
       tahun_akhir,
-      tahun_akademik,
+      tahun_ajaran,
     });
 
     return NextResponse.json({
       success: true,
       id: result[0],
-      message: 'Tahun akademik berhasil ditambahkan',
-      data: { id: result[0], tahun_awal, tahun_akhir, tahun_akademik }
+      message: 'Tahun ajaran berhasil ditambahkan',
+      data: { id: result[0], tahun_awal, tahun_akhir, tahun_ajaran }
     });
   } catch (err) {
-    console.error('❌ POST tahun_akademik error:', err);
+    console.error('❌ POST tahun_ajaran error:', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
@@ -74,25 +74,25 @@ export async function POST(req) {
   }
 }
 
-// PUT: update tahun akademik
+// PUT: update tahun ajaran
 export async function PUT(req) {
   try {
     const body = await req.json();
 
     if (!body.id) {
       return NextResponse.json(
-        { error: 'ID tahun akademik diperlukan' },
+        { error: 'ID tahun ajaran diperlukan' },
         { status: 400 }
       );
     }
 
-    const tahunExists = await knex('tahun_akademik')
+    const tahunExists = await knex('tahun_ajaran')
       .where({ id: body.id })
       .first();
 
     if (!tahunExists) {
       return NextResponse.json(
-        { error: 'Tahun akademik tidak ditemukan' },
+        { error: 'Tahun ajaran tidak ditemukan' },
         { status: 404 }
       );
     }
@@ -112,17 +112,17 @@ export async function PUT(req) {
       const tahun_akhir = tahun_awal + 1;
       updateData.tahun_awal = tahun_awal;
       updateData.tahun_akhir = tahun_akhir;
-      updateData.tahun_akademik = `${tahun_awal}/${tahun_akhir}`;
+      updateData.tahun_ajaran = `${tahun_awal}/${tahun_akhir}`;
     }
 
-    await knex('tahun_akademik').where({ id: body.id }).update(updateData);
+    await knex('tahun_ajaran').where({ id: body.id }).update(updateData);
 
     return NextResponse.json({
       success: true,
-      message: 'Tahun akademik berhasil diupdate'
+      message: 'Tahun ajaran berhasil diupdate'
     });
   } catch (err) {
-    console.error('❌ PUT tahun_akademik error:', err);
+    console.error('❌ PUT tahun_ajaran error:', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }

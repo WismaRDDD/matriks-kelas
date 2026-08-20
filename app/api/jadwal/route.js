@@ -106,7 +106,12 @@ export async function POST(req) {
       ? await knex('dosen')
           .where('dosen.id', body.dosen_id)
           .first()
-      : null;
+      : kelasData.dosen
+        ? await knex('dosen').where({ f_namapegawai: kelasData.dosen }).first()
+        : null;
+    const effectiveDosenId = body.dosen_id || dosenData?.id || null;
+    const newStart = timeToMinutes(body.jam_mulai);
+    const newEnd = timeToMinutes(body.jam_selesai);
     
     // Ambil data ruangan lengkap termasuk lantai
     const ruanganData = await knex('ruangan')
@@ -118,6 +123,23 @@ export async function POST(req) {
         { error: 'Data ruangan tidak ditemukan' },
         { status: 404 }
       );
+    }
+
+    if (effectiveDosenId) {
+      const lecturerSchedules = await knex('jadwal')
+        .where({ hari: body.hari, dosen_id: effectiveDosenId })
+        .select('display_name', 'jam_mulai', 'jam_selesai');
+      const hasLecturerConflict = lecturerSchedules.some((schedule) => (
+        newStart < timeToMinutes(schedule.jam_selesai) &&
+        newEnd > timeToMinutes(schedule.jam_mulai)
+      ));
+
+      if (hasLecturerConflict) {
+        return NextResponse.json(
+          { error: 'Dosen sudah memiliki jadwal lain pada waktu yang sama' },
+          { status: 409 }
+        );
+      }
     }
     
     // Cek apakah sudah ada jadwal yang bentrok
@@ -133,9 +155,6 @@ export async function POST(req) {
     // Cek bentrok waktu
     let isConflict = false;
     let conflictingJadwal = null;
-    
-    const newStart = timeToMinutes(body.jam_mulai);
-    const newEnd = timeToMinutes(body.jam_selesai);
     
     for (const jadwal of existingJadwal) {
       const existingStart = timeToMinutes(jadwal.jam_mulai);
@@ -159,7 +178,7 @@ export async function POST(req) {
     // Siapkan data untuk insert dengan semua field dari tabel jadwal
     const insertData = {
       kelas_id: body.kelas_id,
-      dosen_id: body.dosen_id || null,
+      dosen_id: effectiveDosenId,
       kurikulum_id: body.kurikulum_id || kelasData.f_matkul_id || null,
       hari: body.hari,
       ruangan_id: parseInt(body.ruangan_id),

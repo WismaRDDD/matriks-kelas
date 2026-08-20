@@ -54,115 +54,57 @@ function buildRefreshedSessionCookie(sessionData) {
   return encodeSessionData(refreshed);
 }
 
-function buildUnauthorizedHtml(loginUrl) {
-  return `<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Unauthorized</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #f3f6fb, #e6eef9);
-      color: #1f2937;
-    }
+function clearSessionCookie(response) {
+  response.cookies.set('session', '', {
+    path: '/',
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
 
-    .card {
-      width: min(420px, 92vw);
-      background: #ffffff;
-      border: 1px solid #dbe3ef;
-      border-radius: 14px;
-      padding: 28px;
-      text-align: center;
-      box-shadow: 0 10px 25px rgba(17, 24, 39, 0.08);
-    }
-
-    h1 {
-      margin: 0 0 12px;
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-
-    p {
-      margin: 0 0 20px;
-      color: #4b5563;
-    }
-
-    a {
-      display: inline-block;
-      text-decoration: none;
-      background: #2563eb;
-      color: #ffffff;
-      font-weight: 600;
-      padding: 10px 18px;
-      border-radius: 10px;
-    }
-
-    a:hover {
-      background: #1d4ed8;
-    }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <h1>Silahkan login terlebih dahulu</h1>
-    <p>Anda belum terautentikasi untuk mengakses endpoint ini.</p>
-    <a href="${loginUrl}">Login</a>
-  </main>
-</body>
-</html>`;
+function isProtectedPagePath(pathname) {
+  return (
+    pathname === '/dashboard'
+    || pathname.startsWith('/dashboard/')
+  );
 }
 
 export function middleware(req) {
-  const { pathname, search } = req.nextUrl;
+  const { pathname } = req.nextUrl;
+  const isApiPath = pathname.startsWith('/api/');
+  const isAuthApiPath = pathname.startsWith('/api/auth/');
+  const isProtectedApiPath = isApiPath && !isAuthApiPath;
+  const isProtectedPage = isProtectedPagePath(pathname);
 
-  if (!pathname.startsWith('/api/') || pathname.startsWith('/api/auth/')) {
+  if (!isProtectedApiPath && !isProtectedPage) {
     return NextResponse.next();
   }
 
   const sessionCookie = req.cookies.get('session')?.value;
-  if (isValidSessionCookie(sessionCookie)) {
-    const sessionData = decodeSessionData(sessionCookie);
+  const sessionData = decodeSessionData(sessionCookie);
+  if (sessionData && isValidSessionCookie(sessionCookie)) {
     const response = NextResponse.next();
 
-    if (sessionData) {
-      response.cookies.set('session', buildRefreshedSessionCookie(sessionData), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24,
-        path: '/',
-      });
-    }
+    response.cookies.set('session', buildRefreshedSessionCookie(sessionData), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24,
+      path: '/',
+    });
 
     return response;
   }
 
-  const fullPath = `${pathname}${search || ''}`;
-  const loginUrl = `/login?next=${encodeURIComponent(fullPath)}`;
+  const loginUrl = '/login';
   const accept = req.headers.get('accept') || '';
   const wantsHtml = accept.includes('text/html');
 
-  if (wantsHtml) {
-    const response = new NextResponse(buildUnauthorizedHtml(loginUrl), {
-      status: 401,
-      headers: {
-        'content-type': 'text/html; charset=utf-8',
-      },
-    });
-
-    response.cookies.set('session', '', {
-      path: '/',
-      maxAge: 0,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    });
+  if (isProtectedPage || wantsHtml) {
+    const response = NextResponse.redirect(new URL('/login', req.url));
+    clearSessionCookie(response);
 
     return response;
   }
@@ -175,17 +117,15 @@ export function middleware(req) {
     { status: 401 }
   );
 
-  response.cookies.set('session', '', {
-    path: '/',
-    maxAge: 0,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
+  clearSessionCookie(response);
 
   return response;
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: [
+    '/api/:path*',
+    '/dashboard',
+    '/dashboard/:path*',
+  ],
 };

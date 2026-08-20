@@ -1,7 +1,7 @@
 import knex from '@/lib/knex';
 import { NextResponse } from 'next/server';
 
-// POST: delete tahun akademik (bulk delete)
+// POST: delete tahun ajaran (bulk delete)
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -13,14 +13,14 @@ export async function POST(req) {
       );
     }
 
-    await knex('tahun_akademik').whereIn('id', body.ids).del();
+    await knex('tahun_ajaran').whereIn('id', body.ids).del();
 
     return NextResponse.json({
       success: true,
-      message: 'Tahun akademik berhasil dihapus'
+      message: 'Tahun ajaran berhasil dihapus'
     });
   } catch (err) {
-    console.error('❌ DELETE tahun_akademik error:', err);
+    console.error('❌ DELETE tahun_ajaran error:', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
@@ -28,7 +28,7 @@ export async function POST(req) {
   }
 }
 
-// DELETE: delete single tahun akademik
+// DELETE: delete single tahun ajaran
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -41,21 +41,21 @@ export async function DELETE(req) {
       );
     }
 
-    const result = await knex('tahun_akademik').where({ id }).del();
+    const result = await knex('tahun_ajaran').where({ id }).del();
 
     if (result === 0) {
       return NextResponse.json(
-        { error: 'Tahun akademik tidak ditemukan' },
+        { error: 'Tahun ajaran tidak ditemukan' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Tahun akademik berhasil dihapus'
+      message: 'Tahun ajaran berhasil dihapus'
     });
   } catch (err) {
-    console.error('❌ DELETE tahun_akademik error:', err);
+    console.error('❌ DELETE tahun_ajaran error:', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }

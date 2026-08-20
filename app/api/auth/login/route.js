@@ -32,7 +32,7 @@ export async function POST(req) {
       const response = NextResponse.json({
         success: true,
         role: 'admin',
-        redirect: '/dashboard',
+        redirect: '/dashboard/admin',
       });
       
       response.headers.append('Set-Cookie', cookieString);
@@ -78,7 +78,7 @@ export async function POST(req) {
       const response = NextResponse.json({
         success: true,
         role: 'dosen',
-        redirect: '/dosen/dashboard',
+        redirect: '/dashboard/dosen',
         dosen: {
           id: dosen.id,
           nidn: dosen.f_nidn,

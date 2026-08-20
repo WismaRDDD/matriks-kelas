@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextPath = searchParams.get('next');
   const [role, setRole] = useState('admin');
   const [username, setUsername] = useState('');
   const [nidn, setNidn] = useState('');
@@ -25,9 +23,9 @@ export default function LoginPage() {
           if (data.authenticated) {
             // Redirect based on role
             if (data.session.role === 'admin') {
-              router.push('/dashboard');
+              router.push('/dashboard/admin');
             } else if (data.session.role === 'dosen') {
-              router.push('/dosen/dashboard');
+              router.push('/dashboard/dosen');
             }
           }
         }
@@ -116,15 +114,9 @@ export default function LoginPage() {
         return;
       }
 
-      const isSafeNextPath =
-        typeof nextPath === 'string' &&
-        nextPath.startsWith('/') &&
-        !nextPath.startsWith('//');
-      const redirectTarget = isSafeNextPath ? nextPath : data.redirect;
-
-      console.log('✅ Login successful, redirecting to:', redirectTarget);
-      if (redirectTarget) {
-        router.push(redirectTarget);
+      console.log('✅ Login successful, redirecting to:', data.redirect);
+      if (data.redirect) {
+        router.push(data.redirect);
       }
     } catch (err) {
       console.error('❌ Fetch error:', err);
